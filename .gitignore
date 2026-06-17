@@ -28,7 +28,3 @@ Thumbs.db
 # Project specific
 __pycache__
 models/*.pkl
-data/raw/*.csv
-data/processed/*.csv
-reports/**/*.csv
-reports/**/*.png
