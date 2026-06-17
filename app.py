@@ -141,7 +141,7 @@ with st.sidebar:
     st.markdown("v1.0.0 | Production")
 
 def filter_by_time_horizon(df, horizon):
-    """Filters a DataFrame by date relative to its own max date."""
+    """Filters a DataFrame by date relative to the last actual historical observation."""
     if df is None or df.empty or 'date' not in df.columns:
         return df
     
@@ -150,18 +150,39 @@ def filter_by_time_horizon(df, horizon):
     if not pd.api.types.is_datetime64_any_dtype(df['date']):
         df['date'] = pd.to_datetime(df['date'])
         
-    max_date = df['date'].max()
-    if pd.isna(max_date):
-        return df
-        
+    # Find the true "Today" (last day of actual historical data). 
+    # If the dataframe has predictions, max_date is in the future.
+    # We look at the 'total_pred' dataset globally if possible, but safely fallback to current system date if needed.
+    global_today = pd.to_datetime('today').normalize()
+    
+    # Attempt to find the last historical date if 'actual_total_generation_mw' exists in df
+    if 'actual_total_generation_mw' in df.columns:
+        hist_df = df.dropna(subset=['actual_total_generation_mw'])
+        if not hist_df.empty:
+            global_today = hist_df['date'].max()
+    elif 'actual_solar_generation_mw' in df.columns:
+        hist_df = df.dropna(subset=['actual_solar_generation_mw'])
+        if not hist_df.empty:
+            global_today = hist_df['date'].max()
+    elif 'actual_wind_generation_mw' in df.columns:
+        hist_df = df.dropna(subset=['actual_wind_generation_mw'])
+        if not hist_df.empty:
+            global_today = hist_df['date'].max()
+    else:
+        # For dataframes without actual/predicted split, assume they end on "Today" or have future dates
+        # We will use the system clock 'today', unless the max date in the dataframe is older than today.
+        df_max = df['date'].max()
+        if pd.notna(df_max) and df_max < global_today:
+            global_today = df_max
+            
     if horizon == "All Time":
         return df
     elif horizon == "Today":
-        target_date = max_date
+        target_date = global_today
     elif horizon == "Yesterday":
-        target_date = max_date - pd.Timedelta(days=1)
+        target_date = global_today - pd.Timedelta(days=1)
     elif horizon == "Tomorrow":
-        target_date = max_date + pd.Timedelta(days=1)
+        target_date = global_today + pd.Timedelta(days=1)
     else:
         return df
         

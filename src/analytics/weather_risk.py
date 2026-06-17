@@ -35,10 +35,17 @@ os.makedirs(os.path.join(ROOT_DIR, 'data', 'processed'), exist_ok=True)
 os.makedirs(WEATHER_REPORTS_DIR, exist_ok=True)
 
 def load_weather_data() -> pd.DataFrame:
-    """Load the raw weather data."""
-    logger.info(f"Loading weather data from {INPUT_DATA_PATH}...")
+    """Load the raw historical weather data and future forecasts."""
+    logger.info(f"Loading weather data...")
     try:
         df = pd.read_csv(INPUT_DATA_PATH)
+        forecast_path = os.path.join(ROOT_DIR, 'data', 'raw', 'khavda_weather_forecast.csv')
+        
+        if os.path.exists(forecast_path):
+            forecast_df = pd.read_csv(forecast_path)
+            df = pd.concat([df, forecast_df], ignore_index=True)
+            df = df.drop_duplicates(subset=['date'], keep='last')
+            
         df['date'] = pd.to_datetime(df['date'])
         
         # Clean missing raw data

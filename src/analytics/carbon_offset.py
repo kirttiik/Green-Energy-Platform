@@ -49,11 +49,14 @@ os.makedirs(os.path.join(ROOT_DIR, 'data', 'processed'), exist_ok=True)
 os.makedirs(CARBON_REPORTS_DIR, exist_ok=True)
 
 
-def load_generation_data() -> pd.DataFrame:
-    """Load the processed renewable energy generation dataset."""
-    logger.info(f"Loading generation data from {INPUT_DATA_PATH}...")
+def load_data() -> pd.DataFrame:
+    """Load forecasted renewable energy generation data."""
+    logger.info("Loading generation dataset...")
     try:
-        df = pd.read_csv(INPUT_DATA_PATH)
+        total = pd.read_csv(os.path.join(ROOT_DIR, 'reports', 'total_output', 'total_output_predictions.csv'))
+        
+        # Rename predictions to expected format
+        df = total.rename(columns={'predicted_total_generation_mw': 'total_generation_mw'})
         df['date'] = pd.to_datetime(df['date'])
         
         # Enforce required columns
@@ -238,7 +241,7 @@ def main():
     logger.info("==================================================")
     try:
         # 1. Load Data
-        df = load_generation_data()
+        df = load_data()
         
         # 2. Assign Base Renewable Metric
         # Total generation assumed as MWh equivalents for daily grouping

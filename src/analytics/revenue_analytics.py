@@ -63,11 +63,26 @@ os.makedirs(REVENUE_REPORTS_DIR, exist_ok=True)
 
 
 def load_generation_data() -> pd.DataFrame:
-    """Load processed renewable energy generation data."""
-    logger.info("Loading generation data...")
+    """Load forecasted renewable energy generation data to calculate future revenues."""
+    logger.info("Loading forecasted generation data...")
     try:
-        df = pd.read_csv(GENERATION_PATH)
+        solar = pd.read_csv(os.path.join(ROOT_DIR, 'reports', 'solar', 'solar_predictions.csv'))
+        wind = pd.read_csv(os.path.join(ROOT_DIR, 'reports', 'wind', 'wind_predictions.csv'))
+        total = pd.read_csv(os.path.join(ROOT_DIR, 'reports', 'total_output', 'total_output_predictions.csv'))
+        
+        # Merge them
+        df = pd.merge(solar[['date', 'predicted_solar_generation_mw']], 
+                      wind[['date', 'predicted_wind_generation_mw']], on='date', how='outer')
+        df = pd.merge(df, total[['date', 'predicted_total_generation_mw']], on='date', how='outer')
+        
         df['date'] = pd.to_datetime(df['date'])
+        
+        # Rename to match historical column names so downstream logic doesn't break
+        df = df.rename(columns={
+            'predicted_solar_generation_mw': 'solar_generation_mw',
+            'predicted_wind_generation_mw': 'wind_generation_mw',
+            'predicted_total_generation_mw': 'total_generation_mw'
+        })
         return df
     except Exception as e:
         logger.error(f"Failed to load generation data: {e}")
