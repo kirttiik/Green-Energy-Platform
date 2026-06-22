@@ -1089,6 +1089,7 @@ def render_iex_analytics():
     st.markdown("---")
     st.subheader("📥 Export Market Reports")
 
+    ROOT = os.path.dirname(os.path.abspath(__file__))
     export_files = {
         "IEX Market Summary KPIs": os.path.join(ROOT, 'reports', 'market', 'iex_market_summary.csv'),
         "Revenue Backtesting":     os.path.join(ROOT, 'reports', 'market', 'revenue_backtesting.csv'),
