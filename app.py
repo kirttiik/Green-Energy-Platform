@@ -706,6 +706,13 @@ def load_iex_data():
             df = pd.read_csv(p)
             if 'date' in df.columns:
                 df['date'] = pd.to_datetime(df['date'])
+            if 'iex_prices.csv' in p:
+                if 'dam_price_rs_mwh' in df.columns:
+                    df['dam_price_rs_kwh'] = (df['dam_price_rs_mwh'] / 1000).round(2)
+                if 'rtm_price_rs_mwh' in df.columns:
+                    df['rtm_price_rs_kwh'] = (df['rtm_price_rs_mwh'] / 1000).round(2)
+                elif 'dam_price_rs_mwh' in df.columns:
+                    df['rtm_price_rs_kwh'] = (df['dam_price_rs_mwh'] * 1.03 / 1000).round(2)
             return df
         return pd.DataFrame()
 
