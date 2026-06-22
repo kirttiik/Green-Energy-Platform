@@ -2,7 +2,7 @@
 IEX Market Analytics Engine
 
 Computes all IEX / Energy Market KPIs:
-  - Historical DAM price analytics
+  - Historical DAM & RTM price analytics
   - Revenue backtesting (Generation × Price)
   - Future revenue forecasting
   - Scenario simulation
@@ -34,7 +34,7 @@ os.makedirs(os.path.join(ROOT_DIR, 'data', 'market'), exist_ok=True)
 GEN_PATH      = os.path.join(ROOT_DIR, 'data', 'processed', 'khavda_generation.csv')
 PRED_PATH     = os.path.join(ROOT_DIR, 'reports', 'total_output', 'total_output_predictions.csv')
 IEX_PATH      = os.path.join(ROOT_DIR, 'data', 'market', 'iex_prices.csv')
-FUTURE_FC_PATH = os.path.join(ROOT_DIR, 'reports', 'future_generation_forecast.csv')  # optional
+FUTURE_FC_PATH = os.path.join(ROOT_DIR, 'reports', 'future_generation_forecast.csv')
 
 # Output paths
 SUMMARY_OUT  = os.path.join(MARKET_DIR, 'iex_market_summary.csv')
@@ -61,11 +61,20 @@ def load_iex_prices() -> pd.DataFrame:
         gen_prices()
     df = pd.read_csv(IEX_PATH)
     df['date'] = pd.to_datetime(df['date'])
+    
+    # Ensure RTM price exists (fallback for older generated datasets)
+    if 'rtm_price_rs_mwh' not in df.columns:
+        df['rtm_price_rs_mwh'] = (df['dam_price_rs_mwh'] * 1.03).round(2)
+        
+    # Create per-kWh columns
+    df['dam_price_rs_kwh'] = (df['dam_price_rs_mwh'] / 1000).round(2)
+    df['rtm_price_rs_kwh'] = (df['rtm_price_rs_mwh'] / 1000).round(2)
+    
     return df
 
 
 def load_future_forecast() -> pd.DataFrame:
-    """Load future generation forecast (uses ML predictions as fallback)."""
+    """Load future generation forecast."""
     if os.path.exists(FUTURE_FC_PATH):
         df = pd.read_csv(FUTURE_FC_PATH)
         df['date'] = pd.to_datetime(df['date'])
@@ -87,8 +96,17 @@ def load_future_forecast() -> pd.DataFrame:
 
 def compute_market_kpis(iex: pd.DataFrame, backtest: pd.DataFrame) -> dict:
     avg_price = iex['dam_price_rs_mwh'].mean()
+    avg_price_kwh = iex['dam_price_rs_kwh'].mean()
+    
+    avg_rtm = iex['rtm_price_rs_mwh'].mean()
+    avg_rtm_kwh = iex['rtm_price_rs_kwh'].mean()
+    
     max_price = iex['dam_price_rs_mwh'].max()
+    max_price_kwh = iex['dam_price_rs_kwh'].max()
+    
     min_price = iex['dam_price_rs_mwh'].min()
+    min_price_kwh = iex['dam_price_rs_kwh'].min()
+    
     price_std  = iex['dam_price_rs_mwh'].std()
     volatility = (price_std / avg_price) * 100
 
@@ -99,8 +117,13 @@ def compute_market_kpis(iex: pd.DataFrame, backtest: pd.DataFrame) -> dict:
 
     return {
         'avg_dam_price_rs_mwh' : round(avg_price, 2),
+        'avg_dam_price_rs_kwh' : round(avg_price_kwh, 2),
+        'avg_rtm_price_rs_mwh' : round(avg_rtm, 2),
+        'avg_rtm_price_rs_kwh' : round(avg_rtm_kwh, 2),
         'max_dam_price_rs_mwh' : round(max_price, 2),
+        'max_dam_price_rs_kwh' : round(max_price_kwh, 2),
         'min_dam_price_rs_mwh' : round(min_price, 2),
+        'min_dam_price_rs_kwh' : round(min_price_kwh, 2),
         'price_volatility_pct' : round(volatility, 2),
         'avg_daily_revenue_inr': round(avg_daily_rev, 2),
         'total_revenue_inr'    : round(total_rev, 2),
@@ -119,13 +142,10 @@ def backtest_revenue(gen: pd.DataFrame, iex: pd.DataFrame) -> pd.DataFrame:
     """Merge historical generation with IEX prices → compute revenue."""
     merged = pd.merge(
         gen[['date', 'solar_generation_mw', 'wind_generation_mw', 'total_generation_mw']],
-        iex[['date', 'dam_price_rs_mwh', 'vwap_rs_mwh', 'peak_price', 'offpeak_price']],
+        iex[['date', 'dam_price_rs_mwh', 'dam_price_rs_kwh', 'rtm_price_rs_mwh', 'rtm_price_rs_kwh']],
         on='date', how='inner'
     )
 
-    # Revenue = Generation (MWh/day, since these are daily MW totals treated as MWh)
-    # In practice 1 MW over 1 day = 24 MWh, but our generation values are already in MW-day
-    # We keep consistent with existing platform convention (MW values × price → ₹)
     merged['revenue_inr']       = (merged['total_generation_mw'] * merged['dam_price_rs_mwh']).round(2)
     merged['solar_revenue_inr'] = (merged['solar_generation_mw'] * merged['dam_price_rs_mwh']).round(2)
     merged['wind_revenue_inr']  = (merged['wind_generation_mw']  * merged['dam_price_rs_mwh']).round(2)
@@ -146,12 +166,9 @@ def forecast_revenue(future_gen: pd.DataFrame, iex: pd.DataFrame) -> pd.DataFram
     if future_gen.empty:
         return pd.DataFrame()
 
-    # Rolling 30-day average price (as expected future price)
     iex_sorted = iex.sort_values('date')
     rolling_avg = iex_sorted['dam_price_rs_mwh'].tail(30).mean()
-    rolling_std = iex_sorted['dam_price_rs_mwh'].tail(30).std()
-
-    # Monthly seasonal multiplier for future months
+    
     monthly_mult = {
         1: 1.05, 2: 1.10, 3: 1.25, 4: 1.40, 5: 1.45, 6: 1.30,
         7: 0.90, 8: 0.88, 9: 0.92, 10: 1.00, 11: 0.98, 12: 1.02
@@ -172,11 +189,8 @@ def forecast_revenue(future_gen: pd.DataFrame, iex: pd.DataFrame) -> pd.DataFram
             'date'                    : d,
             'forecast_generation_mw'  : round(gen_mw, 2),
             'expected_dam_price'      : round(expected_price, 2),
-            'optimistic_price'        : round(optimistic, 2),
-            'pessimistic_price'       : round(pessimistic, 2),
+            'expected_dam_price_kwh'  : round(expected_price / 1000, 2),
             'forecast_revenue_inr'    : round(gen_mw * expected_price, 2),
-            'optimistic_revenue_inr'  : round(gen_mw * optimistic, 2),
-            'pessimistic_revenue_inr' : round(gen_mw * pessimistic, 2),
             'forecast_revenue_lakhs'  : round(gen_mw * expected_price / 1e5, 4),
             'forecast_revenue_crores' : round(gen_mw * expected_price / 1e7, 6),
         })
@@ -188,12 +202,7 @@ def forecast_revenue(future_gen: pd.DataFrame, iex: pd.DataFrame) -> pd.DataFram
 # SECTION 4 — SCENARIO SIMULATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def simulate_scenario(
-    backtest: pd.DataFrame,
-    price_change_pct: float = 0.0,
-    gen_change_pct: float = 0.0
-) -> dict:
-    """Simulate impact of price/generation changes on total revenue."""
+def simulate_scenario(backtest: pd.DataFrame, price_change_pct: float = 0.0, gen_change_pct: float = 0.0) -> dict:
     if backtest.empty:
         return {}
 
@@ -219,31 +228,24 @@ def simulate_scenario(
 # SECTION 5 — EXECUTIVE INSIGHTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def generate_executive_insights(
-    iex: pd.DataFrame,
-    backtest: pd.DataFrame,
-    future_rev: pd.DataFrame,
-    kpis: dict
-) -> list[dict]:
+def generate_executive_insights(iex: pd.DataFrame, backtest: pd.DataFrame, future_rev: pd.DataFrame, kpis: dict) -> list[dict]:
     insights = []
-
-    # 1. Price correlation with season
-    monthly_avg = iex.groupby('month')['dam_price_rs_mwh'].mean()
+    
+    monthly_avg = iex.groupby('month')['dam_price_rs_kwh'].mean()
     peak_month  = monthly_avg.idxmax()
     trough_month = monthly_avg.idxmin()
-    month_names = {1:'January',2:'February',3:'March',4:'April',5:'May',6:'June',
-                   7:'July',8:'August',9:'September',10:'October',11:'November',12:'December'}
+    month_names = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',
+                   7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
     insights.append({
-        'Section': 'Price Seasonality',
+        'Section': 'Price Seasonality (kWh)',
         'Insight': (
             f"DAM prices peak in {month_names.get(peak_month, peak_month)} "
-            f"(avg ₹{monthly_avg[peak_month]:,.0f}/MWh) and reach their lowest in "
-            f"{month_names.get(trough_month, trough_month)} (avg ₹{monthly_avg[trough_month]:,.0f}/MWh). "
+            f"(avg ₹{monthly_avg[peak_month]:.2f}/kWh) and reach their lowest in "
+            f"{month_names.get(trough_month, trough_month)} (avg ₹{monthly_avg[trough_month]:.2f}/kWh). "
             f"Scheduling generation maintenance during trough months minimises revenue loss."
         )
     })
 
-    # 2. Revenue concentration
     if not backtest.empty:
         monthly_rev = backtest.groupby('month')['revenue_inr'].sum()
         top_3_months = monthly_rev.nlargest(3)
@@ -257,7 +259,6 @@ def generate_executive_insights(
             )
         })
 
-        # 3. Best revenue days
         top_day = backtest.loc[backtest['revenue_inr'].idxmax()]
         insights.append({
             'Section': 'Peak Revenue Event',
@@ -265,11 +266,10 @@ def generate_executive_insights(
                 f"The highest single-day market revenue of ₹{top_day['revenue_inr']/1e5:.2f} Lakhs was recorded on "
                 f"{top_day['date'].strftime('%d %b %Y')}, when generation reached "
                 f"{top_day['total_generation_mw']:.1f} MW at a DAM clearing price of "
-                f"₹{top_day['dam_price_rs_mwh']:,.0f}/MWh."
+                f"₹{top_day['dam_price_rs_kwh']:.2f}/kWh."
             )
         })
 
-    # 4. Price volatility risk
     insights.append({
         'Section': 'Market Volatility Risk',
         'Insight': (
@@ -280,7 +280,6 @@ def generate_executive_insights(
         )
     })
 
-    # 5. Future revenue outlook
     if not future_rev.empty:
         total_future = future_rev['forecast_revenue_inr'].sum()
         days = len(future_rev)
@@ -295,26 +294,14 @@ def generate_executive_insights(
             )
         })
 
-    # 6. Price floor opportunity
     insights.append({
         'Section': 'Market Floor Strategy',
         'Insight': (
-            f"With a market price floor of ₹{kpis['min_dam_price_rs_mwh']:,.0f}/MWh observed, "
+            f"With a market price floor of ₹{kpis['min_dam_price_rs_kwh']:.2f}/kWh observed, "
             f"Khavda's variable generation cost remains well below this threshold, ensuring "
             f"positive contribution margin under all IEX market clearing scenarios. "
-            f"The average price of ₹{kpis['avg_dam_price_rs_mwh']:,.0f}/MWh provides "
-            f"a strong margin above typical renewable LCOE of ₹1,800–2,200/MWh."
-        )
-    })
-
-    # 7. Monsoon strategy
-    insights.append({
-        'Section': 'Monsoon Season Strategy',
-        'Insight': (
-            "During the monsoon season (July–September), DAM prices decline by 10–15% due to increased "
-            "hydroelectric supply. However, Khavda's wind generation surges during this period, "
-            "partially offsetting the price impact. Operators should consider banking RECs "
-            "during this window for later monetisation at higher prices."
+            f"The average price of ₹{kpis['avg_dam_price_rs_kwh']:.2f}/kWh provides "
+            f"a strong margin above typical renewable LCOE of ₹1.80–2.20/kWh."
         )
     })
 
@@ -322,36 +309,19 @@ def generate_executive_insights(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SAVE REPORTS
+# SAVE REPORTS & MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
 def save_reports(kpis: dict, backtest: pd.DataFrame, future_rev: pd.DataFrame, insights: list):
-    # Market summary KPIs
     pd.DataFrame([kpis]).to_csv(SUMMARY_OUT, index=False)
-    logger.info(f"Market summary saved → {SUMMARY_OUT}")
-
-    # Revenue backtesting
     if not backtest.empty:
         backtest.to_csv(BACKTEST_OUT, index=False)
-        logger.info(f"Revenue backtest saved → {BACKTEST_OUT}")
-
-    # Future revenue
     if not future_rev.empty:
         future_rev.to_csv(FUTURE_OUT, index=False)
-        logger.info(f"Future revenue saved → {FUTURE_OUT}")
-
-    # Executive insights
     if insights:
         pd.DataFrame(insights).to_csv(INSIGHTS_OUT, index=False)
-        logger.info(f"Executive insights saved → {INSIGHTS_OUT}")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────────────────────────────
 
 def run_iex_analytics():
-    """Full IEX analytics pipeline — returns all computed objects for Streamlit."""
     logger.info("=" * 55)
     logger.info("IEX Market Analytics Engine — Starting")
     logger.info("=" * 55)
@@ -378,7 +348,6 @@ def run_iex_analytics():
         'kpis'      : kpis,
         'insights'  : insights,
     }
-
 
 if __name__ == "__main__":
     run_iex_analytics()

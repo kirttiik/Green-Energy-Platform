@@ -754,23 +754,25 @@ def render_iex_analytics():
 
     kpi = summary.iloc[0].to_dict() if not summary.empty else {}
 
-    avg_price   = safe_number(kpi.get('avg_dam_price_rs_mwh', iex_f['dam_price_rs_mwh'].mean()))
-    max_price   = safe_number(kpi.get('max_dam_price_rs_mwh', iex_f['dam_price_rs_mwh'].max()))
-    min_price   = safe_number(kpi.get('min_dam_price_rs_mwh', iex_f['dam_price_rs_mwh'].min()))
+    avg_price   = safe_number(kpi.get('avg_dam_price_rs_kwh', iex_f['dam_price_rs_kwh'].mean()))
+    avg_rtm     = safe_number(kpi.get('avg_rtm_price_rs_kwh', iex_f['rtm_price_rs_kwh'].mean()))
+    max_price   = safe_number(kpi.get('max_dam_price_rs_kwh', iex_f['dam_price_rs_kwh'].max()))
+    min_price   = safe_number(kpi.get('min_dam_price_rs_kwh', iex_f['dam_price_rs_kwh'].min()))
     volatility  = safe_number(kpi.get('price_volatility_pct',
-                              (iex_f['dam_price_rs_mwh'].std() / iex_f['dam_price_rs_mwh'].mean()) * 100))
+                              (iex_f['dam_price_rs_kwh'].std() / iex_f['dam_price_rs_kwh'].mean()) * 100))
     total_rev   = safe_number(kpi.get('total_revenue_inr', bt_f['revenue_inr'].sum() if not bt_f.empty else 0))
     avg_day_rev = safe_number(kpi.get('avg_daily_revenue_inr', bt_f['revenue_inr'].mean() if not bt_f.empty else 0))
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("💹 Avg DAM Price",       f"₹{avg_price:,.0f} /MWh")
-    c2.metric("⬆️ Peak DAM Price",       f"₹{max_price:,.0f} /MWh")
-    c3.metric("⬇️ Floor DAM Price",      f"₹{min_price:,.0f} /MWh")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("💹 Avg DAM Price",       f"₹{avg_price:,.2f} /kWh")
+    c2.metric("⚡ Avg RTM Price",       f"₹{avg_rtm:,.2f} /kWh")
+    c3.metric("⬆️ Peak DAM Price",       f"₹{max_price:,.2f} /kWh")
+    c4.metric("⬇️ Floor DAM Price",      f"₹{min_price:,.2f} /kWh")
 
-    c4, c5, c6 = st.columns(3)
-    c4.metric("💰 Avg Daily Revenue",    f"₹{avg_day_rev/1e5:.2f} L")
-    c5.metric("🏆 Total Market Revenue", f"₹{total_rev/1e7:.2f} Cr")
-    c6.metric("📈 Price Volatility",      f"{volatility:.2f}%")
+    c5, c6, c7 = st.columns(3)
+    c5.metric("💰 Avg Daily Revenue",    f"₹{avg_day_rev/1e5:.2f} L")
+    c6.metric("🏆 Total Market Revenue", f"₹{total_rev/1e7:.2f} Cr")
+    c7.metric("📈 Price Volatility",      f"{volatility:.2f}%")
 
     # ======================================================================
     # SECTION 2 — IEX PRICE ANALYTICS
@@ -785,71 +787,77 @@ def render_iex_analytics():
     with tab1:
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=iex_f['date'], y=iex_f['dam_price_rs_mwh'],
+            x=iex_f['date'], y=iex_f['dam_price_rs_kwh'],
             mode='lines', name='DAM Price',
             line=dict(color='#FF6B35', width=1.5)
         ))
+        if 'rtm_price_rs_kwh' in iex_f.columns:
+            fig.add_trace(go.Scatter(
+                x=iex_f['date'], y=iex_f['rtm_price_rs_kwh'],
+                mode='lines', name='RTM Price',
+                line=dict(color='#2ECC71', width=1.5, dash='dot')
+            ))
         fig.add_trace(go.Scatter(
             x=iex_f['date'],
-            y=iex_f['dam_price_rs_mwh'].rolling(30, min_periods=1).mean(),
-            mode='lines', name='30-Day MA',
+            y=iex_f['dam_price_rs_kwh'].rolling(30, min_periods=1).mean(),
+            mode='lines', name='30-Day MA (DAM)',
             line=dict(color='#004E89', width=2, dash='dash')
         ))
         # Highlight highest / lowest days
         if not iex_f.empty:
-            hi_row = iex_f.loc[iex_f['dam_price_rs_mwh'].idxmax()]
-            lo_row = iex_f.loc[iex_f['dam_price_rs_mwh'].idxmin()]
+            hi_row = iex_f.loc[iex_f['dam_price_rs_kwh'].idxmax()]
+            lo_row = iex_f.loc[iex_f['dam_price_rs_kwh'].idxmin()]
             fig.add_trace(go.Scatter(
-                x=[hi_row['date']], y=[hi_row['dam_price_rs_mwh']],
+                x=[hi_row['date']], y=[hi_row['dam_price_rs_kwh']],
                 mode='markers', name='Highest Day',
                 marker=dict(color='red', size=10, symbol='star')
             ))
             fig.add_trace(go.Scatter(
-                x=[lo_row['date']], y=[lo_row['dam_price_rs_mwh']],
+                x=[lo_row['date']], y=[lo_row['dam_price_rs_kwh']],
                 mode='markers', name='Lowest Day',
                 marker=dict(color='green', size=10, symbol='star')
             ))
         fig.update_layout(
-            title='Daily IEX DAM Clearing Price (₹/MWh)',
-            xaxis_title='Date', yaxis_title='₹ / MWh',
+            title='Daily Market Clearing Price (₹/kWh)',
+            xaxis_title='Date', yaxis_title='₹ / kWh',
             height=420, legend=dict(orientation='h', y=1.1)
         )
         st.plotly_chart(fig, use_container_width=True)
 
         if not iex_f.empty:
-            hi = iex_f.loc[iex_f['dam_price_rs_mwh'].idxmax()]
-            lo = iex_f.loc[iex_f['dam_price_rs_mwh'].idxmin()]
+            hi = iex_f.loc[iex_f['dam_price_rs_kwh'].idxmax()]
+            lo = iex_f.loc[iex_f['dam_price_rs_kwh'].idxmin()]
             c1, c2 = st.columns(2)
-            c1.info(f"🔴 **Highest Price Day:** {hi['date'].strftime('%d %b %Y')}  —  ₹{hi['dam_price_rs_mwh']:,.0f}/MWh")
-            c2.success(f"🟢 **Lowest Price Day:** {lo['date'].strftime('%d %b %Y')}  —  ₹{lo['dam_price_rs_mwh']:,.0f}/MWh")
+            c1.info(f"🔴 **Highest Price Day:** {hi['date'].strftime('%d %b %Y')}  —  ₹{hi['dam_price_rs_kwh']:,.2f}/kWh")
+            c2.success(f"🟢 **Lowest Price Day:** {lo['date'].strftime('%d %b %Y')}  —  ₹{lo['dam_price_rs_kwh']:,.2f}/kWh")
 
     with tab2:
-        monthly_avg = iex.groupby(iex['date'].dt.to_period('M'))['dam_price_rs_mwh'].mean().reset_index()
+        monthly_avg = iex.groupby(iex['date'].dt.to_period('M'))['dam_price_rs_kwh'].mean().reset_index()
         monthly_avg['date'] = monthly_avg['date'].astype(str)
         fig2 = px.bar(
-            monthly_avg, x='date', y='dam_price_rs_mwh',
-            title='Monthly Average DAM Price (₹/MWh)',
-            color='dam_price_rs_mwh',
+            monthly_avg, x='date', y='dam_price_rs_kwh',
+            title='Monthly Average DAM Price (₹/kWh)',
+            color='dam_price_rs_kwh',
             color_continuous_scale='RdYlGn_r',
-            labels={'date': 'Month', 'dam_price_rs_mwh': '₹/MWh'}
+            labels={'date': 'Month', 'dam_price_rs_kwh': '₹/kWh'}
         )
         fig2.update_layout(height=420, coloraxis_showscale=False)
         st.plotly_chart(fig2, use_container_width=True)
 
     with tab3:
         fig3 = px.histogram(
-            iex_f, x='dam_price_rs_mwh', nbins=50,
-            title='DAM Price Distribution',
-            labels={'dam_price_rs_mwh': '₹/MWh', 'count': 'Days'},
+            iex_f, x='dam_price_rs_kwh', nbins=50,
+            title='DAM Price Distribution (₹/kWh)',
+            labels={'dam_price_rs_kwh': '₹/kWh', 'count': 'Days'},
             color_discrete_sequence=['#5B9BD5']
         )
         fig3.add_vline(x=avg_price, line_dash='dash', line_color='red',
-                       annotation_text=f'Avg: ₹{avg_price:,.0f}', annotation_position='top right')
+                       annotation_text=f'Avg: ₹{avg_price:,.2f}', annotation_position='top right')
         fig3.update_layout(height=400)
         st.plotly_chart(fig3, use_container_width=True)
 
     with tab4:
-        rolling_std = iex_f['dam_price_rs_mwh'].rolling(30, min_periods=1).std()
+        rolling_std = iex_f['dam_price_rs_kwh'].rolling(30, min_periods=1).std()
         fig4 = go.Figure()
         fig4.add_trace(go.Scatter(
             x=iex_f['date'], y=rolling_std,
@@ -857,8 +865,8 @@ def render_iex_analytics():
             line=dict(color='#FF4444')
         ))
         fig4.update_layout(
-            title='30-Day Rolling Price Volatility (₹/MWh σ)',
-            xaxis_title='Date', yaxis_title='Std Dev (₹/MWh)', height=380
+            title='30-Day Rolling Price Volatility (₹/kWh σ)',
+            xaxis_title='Date', yaxis_title='Std Dev (₹/kWh)', height=380
         )
         st.plotly_chart(fig4, use_container_width=True)
 
@@ -901,29 +909,29 @@ def render_iex_analytics():
         with col_a:
             st.markdown("**Top 10 Revenue Days**")
             top10 = bt_f.nlargest(10, 'revenue_inr')[[
-                'date','total_generation_mw','dam_price_rs_mwh','revenue_lakhs'
+                'date','total_generation_mw','dam_price_rs_kwh','rtm_price_rs_kwh','revenue_lakhs'
             ]].copy()
             top10['date'] = top10['date'].dt.strftime('%d %b %Y')
-            top10.columns = ['Date','Generation (MW)','DAM Price (₹/MWh)','Revenue (₹ L)']
+            top10.columns = ['Date','Generation (MW)','DAM (₹/kWh)','RTM (₹/kWh)','Revenue (₹ L)']
             st.dataframe(top10.reset_index(drop=True), use_container_width=True)
 
         with col_b:
             st.markdown("**Bottom 10 Revenue Days**")
             bot10 = bt_f.nsmallest(10, 'revenue_inr')[[
-                'date','total_generation_mw','dam_price_rs_mwh','revenue_lakhs'
+                'date','total_generation_mw','dam_price_rs_kwh','rtm_price_rs_kwh','revenue_lakhs'
             ]].copy()
             bot10['date'] = bot10['date'].dt.strftime('%d %b %Y')
-            bot10.columns = ['Date','Generation (MW)','DAM Price (₹/MWh)','Revenue (₹ L)']
+            bot10.columns = ['Date','Generation (MW)','DAM (₹/kWh)','RTM (₹/kWh)','Revenue (₹ L)']
             st.dataframe(bot10.reset_index(drop=True), use_container_width=True)
 
         st.markdown("**Full Backtesting Dataset**")
         display_bt = bt_f[['date','solar_generation_mw','wind_generation_mw',
-                            'total_generation_mw','dam_price_rs_mwh',
+                            'total_generation_mw','dam_price_rs_kwh','rtm_price_rs_kwh',
                             'revenue_inr','revenue_lakhs','revenue_crores']].copy()
         display_bt['date'] = display_bt['date'].dt.strftime('%Y-%m-%d')
         display_bt.columns = [
             'Date','Solar MW','Wind MW','Total MW',
-            'DAM Price (₹/MWh)','Revenue (₹)','Revenue (Lakhs)','Revenue (Crores)'
+            'DAM (₹/kWh)','RTM (₹/kWh)','Revenue (₹)','Revenue (Lakhs)','Revenue (Crores)'
         ]
         st.dataframe(display_bt.tail(60), use_container_width=True)
 

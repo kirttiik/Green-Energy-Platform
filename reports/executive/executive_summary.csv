@@ -47,7 +47,7 @@ date,site_name,total_generation_mw,predicted_total_generation_mw,daily_revenue_i
 2021-08-07,Khavda Renewable Energy Park,94.78467384800123,0.0,426531.03,4265.31,77.72,47.39,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2021-08-08,Khavda Renewable Energy Park,108.82545442015854,0.0,489714.54,4897.15,89.24,54.41,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2021-08-09,Khavda Renewable Energy Park,84.85355312431632,0.0,381840.99,3818.41,69.58,42.43,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2021-08-10,Khavda Renewable Energy Park,106.21728155358196,0.0,477977.77,4779.78,87.1,53.11,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2021-08-10,Khavda Renewable Energy Park,106.21728155358198,0.0,477977.77,4779.78,87.1,53.11,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2021-08-11,Khavda Renewable Energy Park,88.78600909962951,0.0,399537.04,3995.37,72.8,44.39,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2021-08-12,Khavda Renewable Energy Park,74.85693455239654,0.0,336856.21,16842.81,61.38,37.43,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
 2021-08-13,Khavda Renewable Energy Park,90.89514525518518,0.0,409028.15,4090.28,74.53,45.45,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
@@ -1093,7 +1093,7 @@ date,site_name,total_generation_mw,predicted_total_generation_mw,daily_revenue_i
 2024-06-18,Khavda Renewable Energy Park,138.77737167730328,0.0,624498.17,6244.98,113.8,69.39,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2024-06-19,Khavda Renewable Energy Park,128.46538210033077,0.0,578094.22,28904.71,105.34,64.23,0.0,MEDIUM,NORMAL_OPERATIONS,NORMAL,Moderate weather patterns observed. Monitor generation closely.
 2024-06-20,Khavda Renewable Energy Park,138.26568679097113,0.0,622195.59,31109.78,113.38,69.13,0.01,MEDIUM,NORMAL_OPERATIONS,NORMAL,Moderate weather patterns observed. Monitor generation closely.
-2024-06-21,Khavda Renewable Energy Park,75.28016532370393,0.0,338760.74,16938.04,61.73,37.64,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
+2024-06-21,Khavda Renewable Energy Park,75.28016532370394,0.0,338760.74,16938.04,61.73,37.64,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
 2024-06-22,Khavda Renewable Energy Park,70.78436952251053,0.0,318529.66,15926.48,58.04,35.39,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
 2024-06-23,Khavda Renewable Energy Park,97.00491988214502,0.0,436522.14,4365.22,79.54,48.5,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2024-06-24,Khavda Renewable Energy Park,73.218857308992,0.0,329484.86,16474.24,60.04,36.61,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
@@ -1821,20 +1821,20 @@ date,site_name,total_generation_mw,predicted_total_generation_mw,daily_revenue_i
 2026-06-16,Khavda Renewable Energy Park,121.97344245857214,0.0,548880.49,5488.8,100.02,60.99,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2026-06-17,Khavda Renewable Energy Park,118.81656245067856,0.0,534674.53,5346.75,97.43,59.41,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
 2026-06-18,Khavda Renewable Energy Park,115.20777925943102,0.0,518435.01,5184.35,94.47,57.6,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-19,Khavda Renewable Energy Park,115.20777925943102,0.0,518435.01,5184.35,94.47,57.6,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-20,Khavda Renewable Energy Park,115.20777925943102,0.0,518435.01,5184.35,94.47,57.6,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-21,Khavda Renewable Energy Park,115.20777925943102,0.0,518435.01,5184.35,94.47,57.6,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-22,Khavda Renewable Energy Park,115.20777925943102,187.803,518435.01,5184.35,94.47,57.6,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Forecast indicates strong renewable output expected. Weather risks remain low.
-2026-06-23,Khavda Renewable Energy Park,185.8679,185.8679,836405.55,8364.06,152.41,92.93,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-24,Khavda Renewable Energy Park,187.51152,187.51152,843801.84,8438.02,153.76,93.76,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-25,Khavda Renewable Energy Park,179.32072,179.32072,806943.24,8069.43,147.04,89.66,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-26,Khavda Renewable Energy Park,175.13243,175.13243,788095.94,7880.96,143.61,87.57,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-27,Khavda Renewable Energy Park,163.54868,163.54868,735969.06,7359.69,134.11,81.77,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-28,Khavda Renewable Energy Park,175.50395,175.50395,789767.78,7897.68,143.91,87.75,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-29,Khavda Renewable Energy Park,147.77759,147.77759,664999.16,6649.99,121.18,73.89,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-06-30,Khavda Renewable Energy Park,180.9262,180.9262,814167.9,8141.68,148.36,90.46,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-07-01,Khavda Renewable Energy Park,142.56454,142.56454,641540.43,6415.4,116.9,71.28,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-07-02,Khavda Renewable Energy Park,153.16318,153.16318,689234.31,6892.34,125.59,76.58,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-07-03,Khavda Renewable Energy Park,128.37366,128.37366,577681.47,5776.81,105.27,64.19,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
-2026-07-04,Khavda Renewable Energy Park,91.8155,91.8155,413169.75,20658.49,75.29,45.91,0.0,MEDIUM,NORMAL_OPERATIONS,CLOUD_CURTAILMENT,Cloud cover and rainfall may reduce solar generation.
-2026-07-05,Khavda Renewable Energy Park,113.41577,113.41577,510370.96,5103.71,93.0,56.71,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-19,Khavda Renewable Energy Park,118.98996420068462,0.0,535454.84,5354.55,97.57,59.49,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-20,Khavda Renewable Energy Park,118.98996420068462,0.0,535454.84,5354.55,97.57,59.49,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-21,Khavda Renewable Energy Park,118.98996420068462,0.0,535454.84,5354.55,97.57,59.49,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-22,Khavda Renewable Energy Park,118.98996420068462,180.96259,535454.84,5354.55,97.57,59.49,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Forecast indicates strong renewable output expected. Weather risks remain low.
+2026-06-23,Khavda Renewable Energy Park,185.38959,185.38959,834253.16,8342.53,152.02,92.69,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-24,Khavda Renewable Energy Park,183.33975,183.33975,825028.88,8250.29,150.34,91.67,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-25,Khavda Renewable Energy Park,188.93233,188.93233,850195.48,8501.95,154.92,94.47,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-26,Khavda Renewable Energy Park,185.27199,185.27199,833723.96,8337.24,151.92,92.64,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-27,Khavda Renewable Energy Park,157.77452,157.77452,709985.34,7099.85,129.38,78.89,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-28,Khavda Renewable Energy Park,179.72684,179.72684,808770.78,8087.71,147.38,89.86,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-29,Khavda Renewable Energy Park,185.8657,185.8657,836395.65,8363.96,152.41,92.93,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-06-30,Khavda Renewable Energy Park,185.43346,185.43346,834450.57,8344.51,152.06,92.72,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-07-01,Khavda Renewable Energy Park,156.83284,156.83284,705747.78,7057.48,128.6,78.42,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-07-02,Khavda Renewable Energy Park,132.07903,132.07903,594355.63,5943.56,108.3,66.04,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-07-03,Khavda Renewable Energy Park,110.16643,110.16643,495748.94,4957.49,90.34,55.08,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-07-04,Khavda Renewable Energy Park,126.721176,126.721176,570245.29,5702.45,103.91,63.36,0.0,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.
+2026-07-05,Khavda Renewable Energy Park,137.44504,137.44504,618502.68,6185.03,112.7,68.72,0.01,LOW,NORMAL_OPERATIONS,NORMAL,Favorable weather conditions. Revenue outlook remains favorable.

@@ -86,9 +86,15 @@ def generate_iex_prices(start_date: str, end_date: str, seed: int = 42) -> pd.Da
         # VWAP: 12 peak hours (06:00–18:00) + 12 off-peak
         vwap = (peak_price * 12 + offpeak_price * 12) / 24
 
+        # RTM (Real-Time Market) price proxy: Usually tracks DAM but with higher volatility
+        rtm_noise = rng.normal(loc=1.03, scale=0.08) # ~3% higher on average, with 8% variance
+        rtm_price = float(np.clip(price * rtm_noise, MIN_FLOOR_PRICE, MAX_PRICE))
+
+
         records.append({
             'date'            : d.date(),
             'dam_price_rs_mwh': round(price, 2),           # Discovered clearing price
+            'rtm_price_rs_mwh': round(rtm_price, 2),       # Real-Time Market price
             'peak_price'      : round(peak_price, 2),
             'offpeak_price'   : round(offpeak_price, 2),
             'vwap_rs_mwh'     : round(vwap, 2),
