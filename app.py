@@ -113,7 +113,7 @@ data = get_data_sources()
 # SIDEBAR NAVIGATION
 # ==========================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3254/3254095.png", width=100) # Placeholder Logo
+    st.image("https://cdn-icons-png.flaticon.com/512/3254/3254095.png", width=100)
     st.title("Khavda Digital Twin")
     st.markdown("---")
     
@@ -132,30 +132,69 @@ with st.sidebar:
     st.markdown("---")
     global_time_horizon = st.radio(
         "⏱️ Time Horizon",
-        ["All Time", "Yesterday", "Today", "Tomorrow"],
+        ["All Time", "Yesterday", "Today", "Tomorrow", "📅 Custom Range"],
         index=0,
-        help="Filters data relative to the most recent date available in the dataset."
+        help="Filter data by time period. Custom Range lets you pick exact dates."
     )
+    
+    # Custom date range pickers (only shown when Custom Range is selected)
+    custom_start_date = None
+    custom_end_date   = None
+    if global_time_horizon == "📅 Custom Range":
+        import datetime as dt
+        today_sys = dt.date.today()
+        default_start = today_sys - dt.timedelta(days=30)
+        date_range = st.date_input(
+            "Select Date Range",
+            value=(default_start, today_sys),
+            min_value=dt.date(2021, 1, 1),
+            max_value=today_sys + dt.timedelta(days=14),
+            key="custom_date_range"
+        )
+        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+            custom_start_date, custom_end_date = date_range
+        elif isinstance(date_range, dt.date):
+            custom_start_date = custom_end_date = date_range
     
     st.markdown("---")
     st.markdown("v1.0.0 | Production")
 
-def filter_by_time_horizon(df, horizon):
+# Load hourly data
+def load_hourly_data():
+    ROOT = os.path.dirname(os.path.abspath(__file__))
+    hourly_path = os.path.join(ROOT, 'data', 'raw', 'khavda_hourly.csv')
+    if os.path.exists(hourly_path):
+        df = pd.read_csv(hourly_path)
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df['date'] = pd.to_datetime(df['date']).dt.date
+        return df
+    return pd.DataFrame()
+
+hourly_data = load_hourly_data()
+
+# Single-day horizons that should show hourly charts
+SINGLE_DAY_HORIZONS = {"Yesterday", "Today", "Tomorrow"}
+
+def filter_by_time_horizon(df, horizon, custom_start=None, custom_end=None):
     """Filters a DataFrame by date relative to the last actual historical observation."""
     if df is None or df.empty or 'date' not in df.columns:
         return df
     
-    # Ensure datetime without overwriting original if we can avoid warnings
     df = df.copy()
     if not pd.api.types.is_datetime64_any_dtype(df['date']):
         df['date'] = pd.to_datetime(df['date'])
-        
-    # Find the true "Today" (last day of actual historical data). 
-    # If the dataframe has predictions, max_date is in the future.
-    # We look at the 'total_pred' dataset globally if possible, but safely fallback to current system date if needed.
+
+    # Custom Range handling
+    if horizon == "📅 Custom Range":
+        if custom_start and custom_end:
+            start = pd.Timestamp(custom_start)
+            end   = pd.Timestamp(custom_end)
+            return df[(df['date'] >= start) & (df['date'] <= end)]
+        return df
+
+    # Find the true "Today" (last day of actual historical data)
     global_today = pd.to_datetime('today').normalize()
     
-    # Attempt to find the last historical date if 'actual_total_generation_mw' exists in df
     if 'actual_total_generation_mw' in df.columns:
         hist_df = df.dropna(subset=['actual_total_generation_mw'])
         if not hist_df.empty:
@@ -169,8 +208,6 @@ def filter_by_time_horizon(df, horizon):
         if not hist_df.empty:
             global_today = hist_df['date'].max()
     else:
-        # For dataframes without actual/predicted split, assume they end on "Today" or have future dates
-        # We will use the system clock 'today', unless the max date in the dataframe is older than today.
         df_max = df['date'].max()
         if pd.notna(df_max) and df_max < global_today:
             global_today = df_max
@@ -188,6 +225,115 @@ def filter_by_time_horizon(df, horizon):
         
     return df[df['date'].dt.date == target_date.date()]
 
+
+def get_hourly_for_horizon(horizon, custom_start=None, custom_end=None):
+    """Return hourly rows for the current time horizon."""
+    if hourly_data.empty:
+        return pd.DataFrame()
+    
+    hdf = hourly_data.copy()
+    
+    if horizon == "📅 Custom Range":
+        if custom_start and custom_end:
+            return hdf[(hdf['date'] >= custom_start) & (hdf['date'] <= custom_end)]
+        return hdf
+    
+    # Determine reference date from system clock
+    ref_today = pd.Timestamp.now().normalize().date()
+    
+    if horizon == "Today":
+        target = ref_today
+    elif horizon == "Yesterday":
+        target = ref_today - pd.Timedelta(days=1)
+    elif horizon == "Tomorrow":
+        target = ref_today + pd.Timedelta(days=1)
+    else:
+        return hdf  # All Time — return all hourly data
+    
+    return hdf[hdf['date'] == target]
+
+
+def render_hourly_charts(horizon, custom_start=None, custom_end=None):
+    """Render hourly generation and weather charts for single-day views."""
+    hdf = get_hourly_for_horizon(horizon, custom_start, custom_end)
+    
+    if hdf.empty:
+        st.info("Hourly data not yet available. The pipeline will generate it on the next run.")
+        return
+    
+    label = horizon if horizon != "📅 Custom Range" else f"{custom_start} → {custom_end}"
+    st.subheader(f"⏰ Hourly Generation Breakdown — {label}")
+    
+    if horizon in SINGLE_DAY_HORIZONS or (horizon == "📅 Custom Range" and custom_start == custom_end):
+        # Single day — show by hour on x-axis
+        fig_hourly = go.Figure()
+        fig_hourly.add_trace(go.Bar(
+            x=hdf['hour'], y=hdf['solar_generation_mw'],
+            name='Solar (MW)', marker_color='#FFB347'
+        ))
+        fig_hourly.add_trace(go.Bar(
+            x=hdf['hour'], y=hdf['wind_generation_mw'],
+            name='Wind (MW)', marker_color='#5B9BD5'
+        ))
+        fig_hourly.update_layout(
+            barmode='stack',
+            xaxis_title='Hour of Day',
+            yaxis_title='Generation (MW)',
+            title='Hourly Solar + Wind Generation Profile',
+            xaxis=dict(tickmode='linear', tick0=0, dtick=1),
+            legend=dict(orientation='h', yanchor='bottom', y=1.02),
+            height=400
+        )
+        st.plotly_chart(fig_hourly, use_container_width=True)
+        
+        # Weather conditions
+        col1, col2 = st.columns(2)
+        with col1:
+            fig_solar_rad = px.area(
+                hdf, x='hour', y='solar_radiation_wm2',
+                title='Hourly Solar Irradiance (W/m²)',
+                color_discrete_sequence=['#FF8C00']
+            )
+            fig_solar_rad.update_layout(height=300, xaxis_title='Hour')
+            st.plotly_chart(fig_solar_rad, use_container_width=True)
+        with col2:
+            fig_wind = px.line(
+                hdf, x='hour', y='wind_speed_ms',
+                title='Hourly Wind Speed (m/s)',
+                color_discrete_sequence=['#00BFFF']
+            )
+            fig_wind.update_layout(height=300, xaxis_title='Hour')
+            st.plotly_chart(fig_wind, use_container_width=True)
+        
+        # Key metrics row
+        peak_solar_hour = int(hdf.loc[hdf['solar_generation_mw'].idxmax(), 'hour']) if not hdf.empty else 'N/A'
+        peak_wind_hour  = int(hdf.loc[hdf['wind_generation_mw'].idxmax(), 'hour']) if not hdf.empty else 'N/A'
+        total_gen       = hdf['total_generation_mw'].sum()
+        peak_hour_total = int(hdf.loc[hdf['total_generation_mw'].idxmax(), 'hour']) if not hdf.empty else 'N/A'
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Peak Solar Hour", f"{peak_solar_hour}:00")
+        c2.metric("Peak Wind Hour",  f"{peak_wind_hour}:00")
+        c3.metric("Peak Combined",   f"{peak_hour_total}:00")
+        c4.metric("Daily Total",     f"{total_gen:,.0f} MW")
+    else:
+        # Multi-day range — show by datetime
+        fig_multi = go.Figure()
+        fig_multi.add_trace(go.Scatter(
+            x=hdf['datetime'], y=hdf['solar_generation_mw'],
+            name='Solar (MW)', fill='tozeroy', line=dict(color='#FFB347')
+        ))
+        fig_multi.add_trace(go.Scatter(
+            x=hdf['datetime'], y=hdf['wind_generation_mw'],
+            name='Wind (MW)', fill='tozeroy', line=dict(color='#5B9BD5')
+        ))
+        fig_multi.update_layout(
+            xaxis_title='Date/Time', yaxis_title='Generation (MW)',
+            title='Hourly Generation (Multi-Day View)', height=400
+        )
+        st.plotly_chart(fig_multi, use_container_width=True)
+
+
 # ==========================================
 # PAGE ROUTING & RENDER FUNCTIONS
 # ==========================================
@@ -196,7 +342,7 @@ def render_executive_overview():
     st.title("🏠 Executive Overview")
     st.markdown("High-level consolidation of Generation, Financials, Sustainability, and Risk.")
     
-    df_exec = filter_by_time_horizon(data['exec_summary'], global_time_horizon)
+    df_exec = filter_by_time_horizon(data['exec_summary'], global_time_horizon, custom_start_date, custom_end_date)
     
     if not df_exec.empty:
         total_gen = df_exec['total_generation_mw'].sum()
@@ -241,8 +387,14 @@ def render_generation_analytics():
     st.title("⚡ Generation Analytics")
     st.markdown("Detailed breakdown of Solar, Wind, and Total Energy Generation.")
     
-    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon)
+    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_rev.empty:
+        # Show hourly breakdown first for single-day views
+        if global_time_horizon in SINGLE_DAY_HORIZONS or global_time_horizon == "📅 Custom Range":
+            render_hourly_charts(global_time_horizon, custom_start_date, custom_end_date)
+            st.markdown("---")
+            st.subheader("Daily Summary")
+        
         # Solar vs Wind Generation Trend
         fig = px.line(df_rev, x='date', y=['solar_generation_mw', 'wind_generation_mw'],
                       labels={'value': 'Generation (MW)', 'date': 'Date', 'variable': 'Source'},
@@ -268,7 +420,12 @@ def render_forecasting():
     st.title("🔮 Forecasting")
     st.markdown("AI-driven predictions for energy generation.")
     
-    df_total = filter_by_time_horizon(data['total_pred'], global_time_horizon)
+    # Show hourly breakdown for single-day views
+    if global_time_horizon in SINGLE_DAY_HORIZONS or global_time_horizon == "📅 Custom Range":
+        render_hourly_charts(global_time_horizon, custom_start_date, custom_end_date)
+        st.markdown("---")
+    
+    df_total = filter_by_time_horizon(data['total_pred'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_total.empty:
         st.subheader("Total Output Forecast")
         fig = go.Figure()
@@ -308,7 +465,7 @@ def render_carbon_analytics():
     st.title("🌱 Carbon Analytics")
     st.markdown("Sustainability tracking and environmental impact.")
     
-    df_carb = filter_by_time_horizon(data['carbon'], global_time_horizon)
+    df_carb = filter_by_time_horizon(data['carbon'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_carb.empty:
         total_co2 = df_carb['co2_avoided_tons'].sum()
         total_coal = df_carb['coal_saved_tons'].sum()
@@ -328,7 +485,7 @@ def render_weather_risk():
     st.title("⚠️ Weather Risk")
     st.markdown("Analysis of extreme weather events and their operational impact.")
     
-    df_risk = filter_by_time_horizon(data['weather_risk'], global_time_horizon)
+    df_risk = filter_by_time_horizon(data['weather_risk'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_risk.empty:
         counts = df_risk['overall_risk_level'].value_counts()
         
@@ -353,7 +510,7 @@ def render_revenue_analytics():
     st.title("💰 Revenue Analytics")
     st.markdown("Financial intelligence translating engineering output into monetary value.")
     
-    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon)
+    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_rev.empty:
         total_rev = df_rev['daily_revenue_inr'].sum()
         avg_rev = df_rev['daily_revenue_inr'].mean()

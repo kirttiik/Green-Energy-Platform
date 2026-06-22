@@ -11,6 +11,7 @@ PIPELINE_STEPS = [
     "src/forecasting/solar_model.py",
     "src/forecasting/wind_model.py",
     "src/forecasting/total_output_model.py",
+    "src/ingestion/open_meteo_hourly_ingestion.py",   # After models — uses their predictions
     "src/analytics/carbon_offset.py",
     "src/analytics/weather_risk.py",
     "src/analytics/revenue_analytics.py",
