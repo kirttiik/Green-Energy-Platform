@@ -190,7 +190,11 @@ def forecast_revenue(future_gen: pd.DataFrame, iex: pd.DataFrame) -> pd.DataFram
             'forecast_generation_mw'  : round(gen_mw, 2),
             'expected_dam_price'      : round(expected_price, 2),
             'expected_dam_price_kwh'  : round(expected_price / 1000, 2),
+            'optimistic_price'        : round(optimistic, 2),
+            'pessimistic_price'       : round(pessimistic, 2),
             'forecast_revenue_inr'    : round(gen_mw * expected_price, 2),
+            'optimistic_revenue_inr'  : round(gen_mw * optimistic, 2),
+            'pessimistic_revenue_inr' : round(gen_mw * pessimistic, 2),
             'forecast_revenue_lakhs'  : round(gen_mw * expected_price / 1e5, 4),
             'forecast_revenue_crores' : round(gen_mw * expected_price / 1e7, 6),
         })
