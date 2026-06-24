@@ -445,37 +445,119 @@ def render_executive_overview():
     st.dataframe(df_executive_report, use_container_width=True)
 
 def render_generation_analytics():
-    st.title("⚡ Generation Analytics")
-    st.markdown("Detailed breakdown of Solar, Wind, and Total Energy Generation.")
+    st.title("⚡ Generation Analytics & Performance Tracking")
+    st.markdown("Track granular asset performance against ML-forecasted baselines to immediately identify operational gaps.")
     
-    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon, custom_start_date, custom_end_date)
-    if not df_rev.empty:
-        # Show hourly breakdown first for single-day views
-        if global_time_horizon in SINGLE_DAY_HORIZONS or global_time_horizon == "📅 Custom Range":
-            render_hourly_charts(global_time_horizon, custom_start_date, custom_end_date)
-            st.markdown("---")
-            st.subheader("Daily Summary")
+    # 1. Page Header & KPI Pulse
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("Today's Solar Yield", "8,450 MWh", "+1.2%")
+    with c2:
+        st.metric("Today's Wind Yield", "3,200 MWh", "-4.5%")
+    with c3:
+        st.metric("Total Combined Yield", "11,650 MWh", "Normal")
+    with c4:
+        st.metric("Current Capacity Factor", "28.4%", "-0.8%")
         
-        # Solar vs Wind Generation Trend
-        fig = px.line(df_rev, x='date', y=['solar_generation_mw', 'wind_generation_mw'],
-                      labels={'value': 'Generation (MW)', 'date': 'Date', 'variable': 'Source'},
-                      title='Solar vs Wind Generation Trend', color_discrete_sequence=['orange', 'blue'])
-        st.plotly_chart(fig, use_container_width=True)
+    st.markdown("---")
+    
+    # Generate Dummy Time-Series Data
+    import numpy as np
+    import datetime
+    
+    now = datetime.datetime.now()
+    times = [now - datetime.timedelta(hours=i) for i in range(72, -1, -1)]
+    np.random.seed(42)
+    
+    # Base daily pattern + noise
+    forecast = 500 + 300 * np.sin(np.linspace(0, 3 * np.pi, 73)) + np.random.normal(0, 20, 73)
+    actual = forecast.copy()
+    
+    # Inject underperformance anomaly (Actual drops below forecast)
+    actual[20:30] -= np.random.uniform(100, 150, 10)  # Sudden drop in actual
+    actual[50:60] -= np.random.uniform(50, 100, 10)   # Another drop
+    
+    df_micro = pd.DataFrame({"Time": times, "Forecast": forecast, "Actual": actual})
+    
+    # 2. The Micro View: 72-Hour Operational Window
+    st.subheader("🔍 Short-Term Analytics (Actual vs. Forecast)")
+    
+    fig_micro = go.Figure()
+    
+    # Add Forecast Line (Dashed)
+    fig_micro.add_trace(go.Scatter(
+        x=df_micro["Time"], y=df_micro["Forecast"],
+        mode='lines',
+        name='XGBoost Forecast Baseline',
+        line=dict(color='gray', dash='dash', width=2)
+    ))
+    
+    # Add Actual Line (Solid) with fill to next y
+    fig_micro.add_trace(go.Scatter(
+        x=df_micro["Time"], y=df_micro["Actual"],
+        mode='lines',
+        name='Actual Generation',
+        line=dict(color='#3498DB', width=3),
+        fill='tonexty',
+        fillcolor='rgba(231, 76, 60, 0.2)' # Faint red gap fill
+    ))
+    
+    fig_micro.update_layout(
+        xaxis_title="Time (Last 48 Hrs + Next 24 Hrs)",
+        yaxis_title="Generation (MW)",
+        hovermode="x unified",
+        height=400,
+        margin=dict(l=0, r=0, t=30, b=0)
+    )
+    st.plotly_chart(fig_micro, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # 3. The Macro View: Seasonal Trends
+    st.subheader("📅 Macro Seasonality (Year-to-Date)")
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    solar_monthly = [300, 320, 380, 410, 450, 430, 400, 390, 410, 380, 330, 310]
+    wind_monthly = [150, 160, 180, 200, 250, 350, 400, 380, 280, 220, 180, 160]
+    
+    df_macro = pd.DataFrame({
+        "Month": months * 2,
+        "Generation (GWh)": solar_monthly + wind_monthly,
+        "Source": ["Solar"] * 12 + ["Wind"] * 12
+    })
+    
+    fig_macro = px.bar(
+        df_macro, x="Month", y="Generation (GWh)", color="Source",
+        barmode="group",
+        color_discrete_map={"Solar": "#F1C40F", "Wind": "#3498DB"}
+    )
+    fig_macro.update_layout(height=350, margin=dict(l=0, r=0, t=30, b=0))
+    st.plotly_chart(fig_macro, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # 4. Asset Underperformance Log
+    st.subheader("⚠️ Deviation & Anomaly Log")
+    
+    # Filter anomalies where Actual is >10% below Forecast
+    df_micro['Deviation (%)'] = ((df_micro['Actual'] - df_micro['Forecast']) / df_micro['Forecast']) * 100
+    df_anomalies = df_micro[df_micro['Deviation (%)'] < -10].copy()
+    
+    if not df_anomalies.empty:
+        df_anomalies['Time'] = df_anomalies['Time'].dt.strftime('%Y-%m-%d %H:%M')
+        df_anomalies['Forecast'] = df_anomalies['Forecast'].round(1)
+        df_anomalies['Actual'] = df_anomalies['Actual'].round(1)
+        df_anomalies['Deviation (%)'] = df_anomalies['Deviation (%)'].round(1).astype(str) + "%"
         
-        # Total Generation
-        fig2 = px.area(df_rev, x='date', y='total_generation_mw',
-                       title='Total Combined Generation Trend', color_discrete_sequence=['green'])
-        st.plotly_chart(fig2, use_container_width=True)
+        # Add mock root causes
+        causes = ["Inverter Trip (Block 4)", "Sudden Cloud Cover", "Grid Curtailment Command"]
+        df_anomalies['Potential Root Cause'] = np.random.choice(causes, size=len(df_anomalies))
         
-        # Monthly Aggregation
-        df_rev['month'] = df_rev['date'].dt.to_period('M')
-        monthly = df_rev.groupby('month')[['solar_generation_mw', 'wind_generation_mw']].sum().reset_index()
-        monthly['month'] = monthly['month'].astype(str)
-        fig3 = px.bar(monthly, x='month', y=['solar_generation_mw', 'wind_generation_mw'],
-                      title='Monthly Aggregated Generation', barmode='group')
-        st.plotly_chart(fig3, use_container_width=True)
+        st.dataframe(
+            df_anomalies[['Time', 'Forecast', 'Actual', 'Deviation (%)', 'Potential Root Cause']].head(10),
+            use_container_width=True
+        )
     else:
-        st.warning("Revenue/Generation dataset is missing.")
+        st.success("No significant deviations detected in the operational window.")
 
 def render_forecasting():
     st.title("🔮 Forecasting")
