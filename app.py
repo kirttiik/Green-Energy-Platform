@@ -1164,7 +1164,13 @@ def render_grid_analytics():
     fig = go.Figure()
     
     # Safe zones shading
-    fig.add_hrect(y0=49.90, y1=50.05, line_width=0, fillcolor="green", opacity=0.1, annotation_text="Safe Zone")
+    fig.add_hrect(
+        y0=49.90, y1=50.05, 
+        line_width=0, 
+        fillcolor="rgba(0, 255, 0, 0.1)", 
+        annotation_text="Safe Zone", 
+        annotation_position="top left"
+    )
     
     # Scatter plot for frequency
     fig.add_trace(go.Scatter(
@@ -1175,8 +1181,14 @@ def render_grid_analytics():
     ))
     
     # Red lines for danger zones
-    fig.add_hline(y=49.90, line_dash="dash", line_color="red", annotation_text="Under-frequency (<49.90)")
-    fig.add_hline(y=50.05, line_dash="dash", line_color="red", annotation_text="Over-frequency (>50.05)")
+    fig.add_hline(
+        y=50.05, line_dash="dash", line_color="red", 
+        annotation_text="Over-frequency (>50.05)", annotation_position="top right"
+    )
+    fig.add_hline(
+        y=49.90, line_dash="dash", line_color="red", 
+        annotation_text="Under-frequency (<49.90)", annotation_position="bottom right"
+    )
     
     fig.update_layout(
         xaxis_title='Time',
@@ -1193,8 +1205,11 @@ def render_grid_analytics():
     
     # Highlight danger zones in dataframe
     def color_danger(val):
-        color = 'red' if 'High Risk' in str(val) else 'green'
-        return f'color: {color}'
+        if 'High Risk' in str(val):
+            return 'color: #E74C3C; font-weight: bold;'
+        elif str(val) == 'Normal':
+            return 'color: #2ECC71;'
+        return ''
         
     st.dataframe(display_df.style.map(color_danger, subset=['Grid Stress Flag']), use_container_width=True)
 
