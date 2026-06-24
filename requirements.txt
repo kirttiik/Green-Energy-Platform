@@ -8,3 +8,6 @@ shap
 matplotlib
 requests
 playwright
+pdfplumber
+SQLAlchemy
+psycopg2-binary
