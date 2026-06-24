@@ -342,140 +342,107 @@ def render_hourly_charts(horizon, custom_start=None, custom_end=None):
 
 def render_executive_overview():
     st.title("📊 Daily Executive Intelligence Summary")
-    st.markdown("Top-level aggregation of Generation Forecasting, Financial Trading, and Grid Compliance.")
     
-    # Date picker for the executive report
+    # 1. Header & Dynamic Banner
     selected_date = st.date_input("Select Reporting Date:", datetime.date.today())
+    
+    st.info("💡 **Automated Briefing:** Generation is exceeding targets by 2.5% today. Weather is optimal, but monitor grid frequency between 17:00-19:00 for potential DSM penalty exposure.")
     st.markdown("---")
     
-    # =====================================================================
-    # DUMMY DATA GENERATION (Simulating backend models)
-    # =====================================================================
-    # Generation & Revenue
-    total_gen_mwh = 12450.50
-    gen_delta_pct = "+2.5%"
-    projected_revenue = 4520500  # ₹ 45.2 Lakhs
-    revenue_delta = "₹ +1.2 L vs Yesterday"
+    # Dummy data
+    total_yield = 12450.50
+    net_revenue = 4520500
+    dsm_exposure = 15000
+    carbon_offset = 10209.4
     
-    # Sustainability
-    solar_mw = 8500
-    wind_mw = 3950.5
-    co2_avoided_tons = (total_gen_mwh * 1000 * 0.82) / 1000  # Based on 0.82 kg/kWh factor
-    coal_saved_tons = (total_gen_mwh * 1000 * 0.5) / 1000    # Based on 0.5 kg/kWh factor
-    
-    # Grid Risk & Commercial
-    grid_status = "Safe Zone" # Toggle to "High Curtailment Risk" to test the UI
-    iex_dam_price = "₹ 4.15 / kWh"
-    iex_rtm_spike = "Detected between 17:00 - 19:00 (Expected ₹ 6.50 / kWh)"
-    nldc_trend = "Stable around 50.00 Hz. Minor dips expected during evening ramp."
-    dsm_penalty_exposure = "₹ 0 (Negligible Risk)"
-    
-    # =====================================================================
-    # 2. THE "BOTTOM LINE" KPIs
-    # =====================================================================
-    c1, c2, c3 = st.columns(3)
-    
+    # 2. Core KPIs
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Total Forecasted Generation (MWh)", f"{total_gen_mwh:,.0f} MWh", delta=gen_delta_pct)
-        
+        st.metric("Total Portfolio Yield", f"{total_yield:,.0f} MWh", "+2.5%")
     with c2:
-        st.metric("Projected IEX Revenue (₹)", f"₹ {projected_revenue / 100000:,.2f} L", delta=revenue_delta)
-        
+        st.metric("Total Net Revenue", f"₹ {net_revenue/100000:,.2f} L", "+1.2 L")
     with c3:
-        # Custom colored metric for risk status
-        st.markdown("**Grid Compliance Status**")
-        if grid_status == "Safe Zone":
-            st.markdown(f"<h2 style='color:#2ECC71; margin-top:-15px;'>{grid_status}</h2>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<h2 style='color:#E74C3C; margin-top:-15px;'>{grid_status}</h2>", unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # =====================================================================
-    # 3. SECTION 1: ML FORECASTING & SUSTAINABILITY
-    # =====================================================================
-    with st.container():
-        st.subheader("⚡ Generation & Sustainability Outlook")
+        st.metric("DSM Risk Exposure", f"₹ {dsm_exposure:,.0f}", "-₹ 5,000", delta_color="inverse")
+    with c4:
+        st.metric("Carbon Footprint Offset", f"{carbon_offset:,.0f} Tons", "+400 Tons")
         
-        col_gen, col_sus = st.columns([1.5, 1])
-        
-        with col_gen:
-            # Plotly Donut Chart for Asset Breakdown
-            fig_assets = go.Figure(data=[go.Pie(
-                labels=['Solar Generation', 'Wind Generation'],
-                values=[solar_mw, wind_mw],
-                hole=.4,
-                marker_colors=['#F1C40F', '#3498DB']
-            )])
-            fig_assets.update_layout(
-                margin=dict(l=0, r=0, t=30, b=0),
-                height=200,
-                showlegend=True
-            )
-            st.plotly_chart(fig_assets, use_container_width=True)
+    st.markdown("---")
+    
+    # 3. The 5-Module Integration
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        with st.expander("🌤️ Module 1: Weather & Climate Risk", expanded=True):
+            st.markdown("**Peak GHI:** 950 W/m²")
+            st.markdown("**Avg Temperature:** 34°C")
+            st.markdown("**Alerts:** Dust Accumulation Warning (Amber)")
             
-        with col_sus:
-            st.info("**Environmental Impact (Today)**")
-            st.metric("🌍 CO2 Avoided", f"{co2_avoided_tons:,.0f} Tons")
-            st.metric("🪨 Coal Displaced", f"{coal_saved_tons:,.0f} Tons")
+        with st.expander("⚡ Module 2: ML Generation Analytics", expanded=True):
+            st.markdown("**XGBoost Model Accuracy:** 96.4%")
+            st.markdown("**Forecasted Yield:** 12,450 MWh")
+            st.markdown("**Top SHAP Feature:** Cloud Cover Index")
+            
+        with st.expander("🌱 Module 5: Sustainability Reporting", expanded=True):
+            st.markdown("**CO2 Avoided:** 10,209 Tons")
+            st.markdown("**Coal Displaced:** 6,225 Tons")
+
+    with col_right:
+        with st.expander("💰 Module 3: Commercial Revenue (IEX)", expanded=True):
+            st.markdown("**DAM Realized Revenue:** ₹ 38.5 L")
+            st.markdown("**RTM Dispatch Events:** 3 Peaks Targeted")
+            st.markdown("**Avg Clearing Price:** ₹ 4.15 / kWh")
+            
+        with st.expander("⚖️ Module 4: Grid Integrity (NLDC)", expanded=True):
+            st.markdown("**Avg Grid Frequency:** 49.98 Hz")
+            st.markdown("**Excursion Warning Minutes:** 15 Mins")
+            st.markdown("**DSM Penalty Status:** Low Risk (₹ 15,000)")
+            
+    st.markdown("---")
+    
+    # 4. Visual Data (Plotly)
+    st.subheader("📈 Daily Generation Portfolio Contribution")
+    fig = go.Figure(data=[go.Pie(
+        labels=['Solar Farm Block A', 'Solar Farm Block B', 'Wind Turbines'],
+        values=[6000, 2500, 3950.5],
+        hole=.4,
+        marker_colors=['#F1C40F', '#E67E22', '#3498DB']
+    )])
+    fig.update_layout(margin=dict(l=0, r=0, t=30, b=0), height=300)
+    st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
-    # =====================================================================
-    # 4. SECTION 2: COMMERCIAL & GRID RISK SUMMARY
-    # =====================================================================
-    with st.container():
-        st.subheader("📈 Market & Regulatory Exposure")
-        
-        col_iex, col_grid = st.columns(2)
-        
-        with col_iex:
-            st.markdown("#### 💰 IEX Financial Markets")
-            st.markdown(f"**Expected DAM Clearing Price:** <span style='color:#3498DB'>{iex_dam_price}</span>", unsafe_allow_html=True)
-            st.markdown(f"**RTM Spike Opportunity:** <span style='color:#E67E22'>{iex_rtm_spike}</span>", unsafe_allow_html=True)
-            st.caption("Recommendation: Withhold 5% of solar dispatch for evening RTM bidding.")
-            
-        with col_grid:
-            st.markdown("#### ⚖️ Grid DSM Compliance")
-            st.markdown(f"**National Grid Frequency Trend:** {nldc_trend}")
-            st.markdown(f"**Estimated DSM Penalty Exposure:** <span style='color:#2ECC71'>{dsm_penalty_exposure}</span>", unsafe_allow_html=True)
-            st.caption("Operator action required only if frequency drops below 49.90 Hz.")
+    # 5. The CSV Export Fix (Crucial)
+    st.subheader("📑 Comprehensive Corporate Ledger")
+    st.caption("Detailed 5-module cross-sectional data prepared for C-suite export.")
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    df_executive_report = pd.DataFrame([
+        ["Weather", "Peak GHI", "950", "W/m²", "Optimal"],
+        ["Weather", "Temperature", "34", "°C", "Normal"],
+        ["Weather", "Dust Alert", "Amber", "Level", "Action Required"],
+        ["ML Generation", "Model Accuracy", "96.4", "%", "Excellent"],
+        ["ML Generation", "Forecasted Yield", "12450", "MWh", "On Track"],
+        ["ML Generation", "Top SHAP Feature", "Cloud Cover", "Index", "Monitored"],
+        ["Commercial (IEX)", "DAM Revenue", "38.5", "Lakh INR", "Target Met"],
+        ["Commercial (IEX)", "RTM Peaks Targeted", "3", "Events", "Executed"],
+        ["Commercial (IEX)", "Avg Clearing Price", "4.15", "INR/kWh", "Favorable"],
+        ["Grid Integrity", "Avg Frequency", "49.98", "Hz", "Safe Zone"],
+        ["Grid Integrity", "Excursion Minutes", "15", "Mins", "Monitor"],
+        ["Grid Integrity", "DSM Penalty", "15000", "INR", "Low Risk"],
+        ["Sustainability", "CO2 Avoided", "10209", "Tons", "Verified"],
+        ["Sustainability", "Coal Displaced", "6225", "Tons", "Verified"]
+    ], columns=["Module", "KPI Parameter", "Value", "Unit", "Status / Assessment"])
     
-    # =====================================================================
-    # 5. EXECUTIVE ACTION PLAN
-    # =====================================================================
-    st.markdown("### 📋 Executive Action Plan")
-    if grid_status == "Safe Zone":
-        st.success(
-            "**Executive Summary:** Generation is optimal today. Recommend holding baseline schedule. "
-            "Monitor 17:00 to 19:00 window to capitalize on RTM price spikes. No immediate curtailment risks detected."
-        )
-    else:
-        st.error(
-            "**Executive Summary:** High grid curtailment risk detected due to abnormal frequency anomalies. "
-            "Recommend immediate schedule revision and diversion of excess generation to battery storage."
-        )
-    
-    st.markdown("---")
-    
-    # =====================================================================
-    # 6. EXPORT FUNCTIONALITY
-    # =====================================================================
-    csv_data = pd.DataFrame({
-        "Date": [selected_date],
-        "Generation_MWh": [total_gen_mwh],
-        "Revenue_INR": [projected_revenue],
-        "Grid_Status": [grid_status]
-    }).to_csv(index=False).encode('utf-8')
+    csv_data = df_executive_report.to_csv(index=False).encode('utf-8')
     
     st.download_button(
-        label="📥 Download Daily Executive Report (CSV)",
+        label="📥 Download Corporate Ledger (CSV)",
         data=csv_data,
-        file_name=f"Khavda_Executive_Summary_{selected_date}.csv",
+        file_name=f"Khavda_Corporate_Ledger_{selected_date}.csv",
         mime="text/csv",
     )
+    
+    st.dataframe(df_executive_report, use_container_width=True)
 
 def render_generation_analytics():
     st.title("⚡ Generation Analytics")
