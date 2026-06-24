@@ -1117,24 +1117,6 @@ def render_iex_analytics():
 # ==========================================
 # ROUTING LOGIC
 # ==========================================
-if selection == "🏠 Executive Overview":
-    render_executive_overview()
-elif selection == "⚡ Generation Analytics":
-    render_generation_analytics()
-elif selection == "🔮 Forecasting":
-    render_forecasting()
-elif selection == "🌱 Carbon Analytics":
-    render_carbon_analytics()
-elif selection == "⚠️ Weather Risk":
-    render_weather_risk()
-elif selection == "💰 Revenue Analytics":
-    render_revenue_analytics()
-elif selection == "🧠 AI Explainability":
-    render_explainability()
-elif selection == "🔬 SHAP Analytics":
-    render_shap_analytics()
-elif selection == "⚡ IEX Analytics":
-    render_iex_analytics()
 
 # ===========================================================================
 # GRID INTELLIGENCE
@@ -1216,6 +1198,24 @@ def render_grid_analytics():
         
     st.dataframe(display_df.style.applymap(color_danger, subset=['Grid Stress Flag']), use_container_width=True)
 
+if selection == "🏠 Executive Overview":
+    render_executive_overview()
+elif selection == "⚡ Generation Analytics":
+    render_generation_analytics()
+elif selection == "🔮 Forecasting":
+    render_forecasting()
+elif selection == "🌱 Carbon Analytics":
+    render_carbon_analytics()
+elif selection == "⚠️ Weather Risk":
+    render_weather_risk()
+elif selection == "💰 Revenue Analytics":
+    render_revenue_analytics()
+elif selection == "🧠 AI Explainability":
+    render_explainability()
+elif selection == "🔬 SHAP Analytics":
+    render_shap_analytics()
+elif selection == "⚡ IEX Analytics":
+    render_iex_analytics()
 elif selection == "🌐 Grid Intelligence":
     render_grid_analytics()
 
