@@ -1196,7 +1196,7 @@ def render_grid_analytics():
         color = 'red' if 'High Risk' in str(val) else 'green'
         return f'color: {color}'
         
-    st.dataframe(display_df.style.applymap(color_danger, subset=['Grid Stress Flag']), use_container_width=True)
+    st.dataframe(display_df.style.map(color_danger, subset=['Grid Stress Flag']), use_container_width=True)
 
 if selection == "🏠 Executive Overview":
     render_executive_overview()
