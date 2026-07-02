@@ -123,7 +123,6 @@ with st.sidebar:
         "🔮 Forecasting",
         "🌱 Carbon Analytics",
         "⚠️ Weather Risk",
-        "💰 Revenue Analytics",
         "🧠 AI Explainability",
         "🔬 SHAP Analytics",
         "⚡ IEX Analytics",
@@ -675,31 +674,6 @@ def render_weather_risk():
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.warning("Weather Risk dataset is missing.")
-
-def render_revenue_analytics():
-    st.title("💰 Revenue Analytics")
-    st.markdown("Financial intelligence translating engineering output into monetary value.")
-    
-    df_rev = filter_by_time_horizon(data['revenue'], global_time_horizon, custom_start_date, custom_end_date)
-    if not df_rev.empty:
-        total_rev = df_rev['daily_revenue_inr'].sum()
-        avg_rev = df_rev['daily_revenue_inr'].mean()
-        risk_rev = df_rev.get('revenue_at_risk_inr', pd.Series(0)).sum()
-        ann_rev = avg_rev * 365
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Revenue (INR)", f"₹ {safe_number(total_rev):,.0f}")
-        col2.metric("Avg Daily Revenue", f"₹ {safe_number(avg_rev):,.0f}")
-        col3.metric("Revenue At Risk", f"₹ {safe_number(risk_rev):,.0f}")
-        col4.metric("Annualized Revenue", f"₹ {safe_number(ann_rev):,.0f}")
-        
-        fig = px.line(df_rev, x='date', y='daily_revenue_inr', title="Daily Revenue Trend", color_discrete_sequence=['teal'])
-        st.plotly_chart(fig, use_container_width=True)
-        
-        fig2 = px.area(df_rev, x='date', y=['solar_revenue_inr', 'wind_revenue_inr'], title="Revenue Breakdown: Solar vs Wind")
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.warning("Revenue Analytics dataset is missing.")
 
 def render_explainability():
     st.title("🧠 AI Explainability")
@@ -1524,8 +1498,6 @@ elif selection == "🌱 Carbon Analytics":
     render_carbon_analytics()
 elif selection == "⚠️ Weather Risk":
     render_weather_risk()
-elif selection == "💰 Revenue Analytics":
-    render_revenue_analytics()
 elif selection == "🧠 AI Explainability":
     render_explainability()
 elif selection == "🔬 SHAP Analytics":
