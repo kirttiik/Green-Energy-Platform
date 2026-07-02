@@ -73,7 +73,7 @@ def load_data() -> pd.DataFrame:
 
 
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
-    logger.info("Performing feature engineering...")
+    logger.info("Performing feature engineering (with physics-informed PV features)...")
     df = df.copy()
     
     # Sort chronologically to prevent data leakage
@@ -87,32 +87,50 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df['week_of_year'] = df['date'].dt.isocalendar().week.astype(int)
     df['is_weekend'] = df['date'].dt.dayofweek.isin([5, 6]).astype(int)
     
-    features = [
+    base_features = [
         'temperature_c', 'humidity_pct', 'wind_speed_ms', 'solar_radiation_kwh_m2_day', 
         'cloud_cover_pct', 'rainfall_mm', 'month', 'quarter', 'day_of_year', 
         'week_of_year', 'is_weekend'
     ]
+    
+    # All six physics-informed PV engineered features
+    pv_features = [
+        col for col in [
+            'effective_irradiance', 'ghi_w_m2',
+            'cell_temperature_c', 'temperature_factor',
+            'cloud_factor', 'performance_ratio', 'capacity_factor'
+        ] if col in df.columns
+    ]
+    
+    features = base_features + pv_features
     target = 'total_generation_mw'
     
     req_cols = features + [target, 'date']
-    df = df[req_cols]
+    df = df[[c for c in req_cols if c in df.columns]]
     
     # Remove null values ONLY in features
+    available_features = [f for f in features if f in df.columns]
     initial_len = len(df)
-    df = df.dropna(subset=features)
+    df = df.dropna(subset=available_features)
     if len(df) < initial_len:
         logger.info(f"Dropped {initial_len - len(df)} rows containing null values.")
-        
+    
+    logger.info(f"Total output features ({len(available_features)}): {available_features}")
     return df
 
 
 def train_model(df: pd.DataFrame):
     logger.info("Splitting data and training model...")
-    features = [
+    base_features = [
         'temperature_c', 'humidity_pct', 'wind_speed_ms', 'solar_radiation_kwh_m2_day', 
         'cloud_cover_pct', 'rainfall_mm', 'month', 'quarter', 'day_of_year', 
         'week_of_year', 'is_weekend'
     ]
+    pv_extras = [
+        'effective_irradiance', 'ghi_w_m2', 'cell_temperature_c',
+        'temperature_factor', 'cloud_factor', 'performance_ratio', 'capacity_factor'
+    ]
+    features = base_features + [f for f in pv_extras if f in df.columns]
     target = 'total_generation_mw'
     
     # Split historical vs future

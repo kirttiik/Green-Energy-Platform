@@ -1,0 +1,30 @@
+# =============================================================
+# Khavda Renewable Energy Park — Plant Configuration
+# =============================================================
+# All physical parameters used by the Physics-Informed PV Engine
+# and the Wind Power Curve Model.
+# Update these values when physical plant parameters change.
+# =============================================================
+
+site:
+  name: "Khavda Renewable Energy Park"
+  latitude: 23.83       # Degrees North
+  longitude: 68.77      # Degrees East
+  altitude_m: 27        # Metres above sea level
+  timezone: "Asia/Kolkata"
+
+solar:
+  installed_capacity_mw: 1000.0
+  module_efficiency: 0.22             # Monocrystalline PERC — 22%
+  performance_ratio: 0.82             # Accounts for inverter, cable, dust, mismatch losses
+  temperature_coefficient: -0.004     # Per-degree-C above STC (25°C), i.e. -0.4%/°C
+  noct_c: 45                          # Normal Operating Cell Temperature (°C)
+  reference_irradiance_w_m2: 1000.0  # STC reference irradiance
+  reference_temp_c: 25.0              # STC reference temperature
+
+wind:
+  installed_capacity_mw: 500.0
+  cut_in_speed_ms: 3.0    # Minimum wind speed to generate power (m/s)
+  rated_speed_ms: 12.0    # Wind speed at which turbine reaches rated power (m/s)
+  cut_out_speed_ms: 25.0  # Safety shutdown wind speed (m/s)
+  efficiency: 0.35         # Overall drivetrain + generator efficiency

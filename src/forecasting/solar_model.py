@@ -71,7 +71,7 @@ def load_data() -> pd.DataFrame:
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     """
     Convert dates to datetime objects and engineer new time-series features.
-    Filters the dataset down to the required features and target.
+    Now includes physics-informed PV features from generate_renewable_generation.py.
     """
     logger.info("Performing feature engineering...")
     try:
@@ -86,8 +86,8 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         df['week_of_year'] = df['date'].dt.isocalendar().week.astype(int)
         df['is_weekend'] = df['date'].dt.dayofweek.isin([5, 6]).astype(int)
         
-        # Define exact features required by specifications
-        features = [
+        # Base weather features
+        base_features = [
             'temperature_c', 
             'humidity_pct', 
             'solar_radiation_kwh_m2_day',
@@ -100,6 +100,17 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
             'week_of_year', 
             'is_weekend'
         ]
+        
+        # Physics-informed PV engineered features (from generation engine)
+        pv_features = [
+            col for col in [
+                'effective_irradiance', 'cell_temperature_c',
+                'temperature_factor', 'cloud_factor',
+                'performance_ratio', 'capacity_factor', 'ghi_w_m2'
+            ] if col in df.columns
+        ]
+        
+        features = base_features + pv_features
         target = 'solar_generation_mw'
         
         # Subselect the required columns and handle NaNs ONLY in features
@@ -108,7 +119,8 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         # Ensure chronological order for proper time series splitting
         final_df = final_df.sort_values('date').reset_index(drop=True)
         
-        logger.info(f"Feature engineering complete. Prepared dataset shape: {final_df.shape}")
+        logger.info(f"Feature engineering complete. Features: {features}")
+        logger.info(f"Prepared dataset shape: {final_df.shape}")
         return final_df
     except Exception as e:
         logger.error(f"Error during feature engineering: {e}")

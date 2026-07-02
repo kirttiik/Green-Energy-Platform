@@ -8,7 +8,7 @@ PIPELINE_STEPS = [
     "src/ingestion/iex_scraper.py",
     "src/ingestion/khavda_weather_ingestion.py",
     "src/ingestion/open_meteo_ingestion.py",
-    "src/ingestion/generate_renewable_generation.py",
+    "src/ingestion/generate_renewable_generation.py",   # pvlib Physics Engine
     "src/forecasting/solar_model.py",
     "src/forecasting/wind_model.py",
     "src/forecasting/total_output_model.py",
@@ -16,7 +16,6 @@ PIPELINE_STEPS = [
     "src/analytics/carbon_offset.py",
     "src/analytics/weather_risk.py",
     "src/analytics/iex_analytics.py",
-    "src/analytics/revenue_analytics.py",
     "src/analytics/model_explainability.py",
     "src/analytics/shap_explainability.py",
     "src/analytics/executive_summary.py"

@@ -1,221 +1,337 @@
 """
-Renewable Generation Synthesis Module
+Physics-Informed PV & Wind Generation Engine (pvlib)
+=====================================================
 
-This module serves as a Weather-Driven Renewable Generation Modeling Engine for the 
-Khavda Renewable Energy Park. It estimates historical Solar and Wind generation (MW) 
-based on weather conditions ingested from the NASA POWER API and predefined 
-capacity and efficiency assumptions.
+Replaces the empirical radiation-scaling approach with a full
+physics-informed photovoltaic model powered by pvlib:
+
+  1. Load plant configuration from config/plant_config.yaml
+  2. Convert daily GHI (kWh/m²/day) to approximate W/m² peak irradiance
+  3. Compute PV cell temperature using the Faiman (NOCT) model via pvlib
+  4. Apply temperature-dependent efficiency correction (γ·ΔT)
+  5. Compute effective irradiance (GHI × cloud factor)
+  6. Apply system Performance Ratio (PR = 0.82)
+  7. Calculate final DC→AC power output, clamped to installed capacity
+  8. Retain wind model (cubic power-curve — no pvlib equivalent needed)
+  9. Compute and persist all engineered PV features for ML consumption
+  10. Run multi-rule validation before saving
+
+Engineered columns added to khavda_generation.csv:
+  effective_irradiance_kwh_m2_day
+  ghi_w_m2                        (approximate peak W/m²)
+  cell_temperature_c
+  temperature_factor
+  cloud_factor
+  performance_ratio
+  capacity_factor
 """
 
 import os
+import logging
+import yaml
 import pandas as pd
 import numpy as np
-import logging
 
-# Configure logging
+try:
+    import pvlib
+    HAS_PVLIB = True
+except ImportError:
+    HAS_PVLIB = False
+    logging.warning("pvlib not installed — falling back to manual NOCT cell-temp calculation.")
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# ==================================================
-# KHAVDA ASSUMPTIONS & CONSTANTS
-# ==================================================
-SOLAR_CAPACITY_MW = 1000.0
-WIND_CAPACITY_MW = 500.0
-SOLAR_EFFICIENCY = 0.22
-WIND_EFFICIENCY = 0.35
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WEATHER_PATH = os.path.join(ROOT_DIR, "data", "raw", "khavda_weather.csv")
+CONFIG_PATH  = os.path.join(ROOT_DIR, "config", "plant_config.yaml")
+OUTPUT_PATH  = os.path.join(ROOT_DIR, "data", "processed", "khavda_generation.csv")
 
-# Additional engineering constants for realistic modeling
-SOLAR_TEMP_COEF = -0.004  # 0.4% efficiency loss per degree C above threshold
-SOLAR_TEMP_THRESHOLD_C = 25.0
 
-WIND_CUT_IN_SPEED = 3.0   # m/s
-WIND_RATED_SPEED = 12.0   # m/s
-WIND_CUT_OUT_SPEED = 25.0 # m/s
+# ---------------------------------------------------------------------------
+# 1. Load Configuration
+# ---------------------------------------------------------------------------
+def load_config() -> dict:
+    """Load plant parameters from config/plant_config.yaml."""
+    with open(CONFIG_PATH, "r") as f:
+        cfg = yaml.safe_load(f)
+    logger.info(f"Loaded plant config: {cfg['site']['name']}")
+    return cfg
 
+
+# ---------------------------------------------------------------------------
+# 2. Load Weather Data
+# ---------------------------------------------------------------------------
 def load_weather_data() -> pd.DataFrame:
-    """
-    Load raw weather data for Khavda from the data/raw directory.
-    """
-    try:
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        file_path = os.path.join(root_dir, "data", "raw", "khavda_weather.csv")
-        
-        logger.info(f"Loading weather data from {file_path}")
-        df = pd.read_csv(file_path)
-        
-        # Ensure date is datetime
-        df['date'] = pd.to_datetime(df['date'])
-        
-        # Fill missing numeric values with 0 or forward fill to avoid breaking calculations
-        numeric_cols = ['temperature_c', 'cloud_cover_pct', 'solar_radiation_kwh_m2_day', 'wind_speed_ms']
-        df[numeric_cols] = df[numeric_cols].ffill().fillna(0)
-        
-        return df
-    except Exception as e:
-        logger.error(f"Error loading weather data: {e}")
-        raise
+    """Load raw weather CSV and forward-fill sparse sensor gaps."""
+    logger.info(f"Loading weather data from {WEATHER_PATH}")
+    df = pd.read_csv(WEATHER_PATH)
+    df["date"] = pd.to_datetime(df["date"])
 
-def calculate_solar_generation(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate solar generation (MW) based on weather conditions.
-    
-    Logic Requirements Addressed:
-    1. Base generation is driven by solar radiation (Higher radiation = higher gen).
-    2. Cloud cover percentage acts as a derating factor (Higher cloud cover = lower gen).
-    3. High temperatures (above 25C) reduce panel efficiency slightly.
-    4. Total generation is strictly capped at the installed capacity.
-    """
-    # 1. Base potential from radiation (kWh/m2/day)
-    # Normalizing against an assumed max daily radiation of 8.0 for full output scaling
-    base_potential = (df['solar_radiation_kwh_m2_day'] / 8.0) * SOLAR_CAPACITY_MW * SOLAR_EFFICIENCY
-    
-    # 2. Cloud cover penalty
-    # Assume 100% cloud cover still allows ~40% generation due to diffuse radiation
-    cloud_penalty = 1.0 - (df['cloud_cover_pct'] / 100.0 * 0.6)
-    
-    # 3. Temperature penalty
-    # Apply the temperature coefficient (-0.004/C) for temperatures above the 25C threshold
-    temp_diff = np.maximum(df['temperature_c'] - SOLAR_TEMP_THRESHOLD_C, 0)
-    temp_penalty = 1.0 + (temp_diff * SOLAR_TEMP_COEF)
-    
-    # Calculate final generation
-    solar_gen = base_potential * cloud_penalty * temp_penalty
-    
-    # 4. Capacity constraints: Ensure non-negative and capped at SOLAR_CAPACITY_MW
-    solar_gen = np.clip(solar_gen, 0, SOLAR_CAPACITY_MW)
-    
-    return solar_gen
-
-def calculate_wind_generation(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate wind generation (MW) using a simplified engineering wind power curve.
-    
-    Logic Requirements Addressed:
-    1. Low wind speed (< Cut-in) = 0 MW
-    2. Medium wind speed (Cut-in to Rated) = Increasing generation (cubic scaling)
-    3. High wind speed (Rated to Cut-out) = Maximum generation scaled by efficiency
-    4. Very High wind speed (> Cut-out) = 0 MW (safety shutdown)
-    5. Generation must not exceed installed capacity.
-    """
-    wind_speed = df['wind_speed_ms']
-    
-    # Initialize series with zeros
-    wind_gen = pd.Series(0.0, index=df.index)
-    
-    # Region 2: Between cut-in and rated speed (increasing generation)
-    # Using a cubic scaling typical for wind turbine power formulas (P ~ v^3)
-    mask_curve = (wind_speed >= WIND_CUT_IN_SPEED) & (wind_speed < WIND_RATED_SPEED)
-    power_factor = ((wind_speed[mask_curve] - WIND_CUT_IN_SPEED) / (WIND_RATED_SPEED - WIND_CUT_IN_SPEED)) ** 3
-    wind_gen[mask_curve] = power_factor * WIND_CAPACITY_MW * WIND_EFFICIENCY
-    
-    # Region 3: Between rated and cut-out speed (max generation)
-    mask_rated = (wind_speed >= WIND_RATED_SPEED) & (wind_speed <= WIND_CUT_OUT_SPEED)
-    wind_gen[mask_rated] = WIND_CAPACITY_MW * WIND_EFFICIENCY
-    
-    # Capacity constraints: Ensure non-negative and capped at WIND_CAPACITY_MW
-    wind_gen = np.clip(wind_gen, 0, WIND_CAPACITY_MW)
-    
-    return wind_gen
-
-def generate_total_output(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate Solar, Wind, and Total generation and attach them to the dataframe.
-    """
-    logger.info("Calculating Solar Generation...")
-    df['solar_generation_mw'] = calculate_solar_generation(df)
-    
-    logger.info("Calculating Wind Generation...")
-    df['wind_generation_mw'] = calculate_wind_generation(df)
-    
-    logger.info("Calculating Total Generation...")
-    df['total_generation_mw'] = df['solar_generation_mw'] + df['wind_generation_mw']
-    
+    numeric_cols = [
+        "temperature_c", "cloud_cover_pct",
+        "solar_radiation_kwh_m2_day", "wind_speed_ms",
+        "humidity_pct", "rainfall_mm"
+    ]
+    df[numeric_cols] = df[numeric_cols].ffill().fillna(0)
+    logger.info(f"Weather data loaded — {len(df)} rows.")
     return df
 
-def validate_generation_data(df: pd.DataFrame) -> bool:
+
+# ---------------------------------------------------------------------------
+# 3. PV Feature Engineering
+# ---------------------------------------------------------------------------
+def engineer_pv_features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """
-    Validate the synthesized generation data against engineering and data quality rules.
-    - No negative generation
-    - No values above installed capacity
-    - No null values in final generation columns
+    Derive physics-informed PV features from raw weather columns.
+
+    Parameters added:
+      ghi_w_m2               — approximate peak GHI in W/m²
+      effective_irradiance    — GHI after cloud attenuation (kWh/m²/day)
+      cloud_factor            — linear cloud-cover penalty [0, 1]
+      cell_temperature_c     — PV module operating temperature (pvlib or NOCT)
+      temperature_factor     — efficiency multiplier from temperature [0.70, 1.05]
+      performance_ratio      — system losses constant (PR = 0.82)
     """
-    logger.info("Validating synthesized generation data...")
-    
-    gen_cols = ['solar_generation_mw', 'wind_generation_mw', 'total_generation_mw']
-    
-    # Check for nulls
-    if df[gen_cols].isnull().any().any():
-        logger.error("Validation Failed: Null values detected in generation columns.")
+    solar_cfg = cfg["solar"]
+    NOCT      = solar_cfg["noct_c"]
+    GAMMA     = solar_cfg["temperature_coefficient"]   # -0.004 /°C
+    T_STC     = solar_cfg["reference_temp_c"]          # 25 °C
+    PR        = solar_cfg["performance_ratio"]
+
+    # --- 3a. Convert daily kWh/m²/day → approximate peak W/m² (÷ by 3.6) --------
+    # A common heuristic: 1 kWh/m²/day ≈ 1 PSH (peak-sun-hour), so the
+    # average irradiance over daylight (~8 h) ≈ GHI_kWh × 1000 / 8
+    df["ghi_w_m2"] = (df["solar_radiation_kwh_m2_day"] * 1000.0 / 8.0).clip(lower=0)
+
+    # --- 3b. Cloud Factor (linear attenuation) -----------------------------------
+    df["cloud_factor"] = (1.0 - df["cloud_cover_pct"] / 100.0).clip(0.0, 1.0)
+
+    # --- 3c. Effective Irradiance (kWh/m²/day after cloud attenuation) -----------
+    df["effective_irradiance"] = (
+        df["solar_radiation_kwh_m2_day"] * df["cloud_factor"]
+    ).clip(lower=0)
+
+    # --- 3d. PV Cell Temperature (pvlib Faiman model or fallback NOCT) -----------
+    if HAS_PVLIB:
+        # pvlib.temperature.faiman expects W/m² irradiance and ambient temp in °C
+        df["cell_temperature_c"] = pvlib.temperature.faiman(
+            poa_global=df["ghi_w_m2"],           # Plane-of-array irradiance (W/m²)
+            temp_air=df["temperature_c"],          # Ambient temperature (°C)
+            wind_speed=df["wind_speed_ms"].clip(lower=0),
+        )
+    else:
+        # NOCT approximation: T_cell = T_amb + (NOCT - 20)/800 × GHI_W/m²
+        df["cell_temperature_c"] = (
+            df["temperature_c"] + ((NOCT - 20.0) / 800.0) * df["ghi_w_m2"]
+        )
+
+    # --- 3e. Temperature Factor --------------------------------------------------
+    df["temperature_factor"] = (
+        1.0 + GAMMA * (df["cell_temperature_c"] - T_STC)
+    ).clip(0.70, 1.05)
+
+    # --- 3f. Performance Ratio (constant, stored as a column for ML) -------------
+    df["performance_ratio"] = PR
+
+    logger.info("PV feature engineering complete.")
+    return df
+
+
+# ---------------------------------------------------------------------------
+# 4. Physics-Informed Solar Generation
+# ---------------------------------------------------------------------------
+def calculate_solar_generation(df: pd.DataFrame, cfg: dict) -> pd.Series:
+    """
+    Estimated_Generation =
+        Installed_Capacity × PR × (Effective_Irradiance / Max_Effective_Irradiance)
+        × Temperature_Factor × Cloud_Factor
+
+    Clamped to [0, Installed_Capacity_MW].
+    """
+    solar_cfg   = cfg["solar"]
+    CAPACITY    = solar_cfg["installed_capacity_mw"]
+    EFFICIENCY  = solar_cfg["module_efficiency"]
+    REF_GHI     = solar_cfg["reference_irradiance_w_m2"]  # 1000 W/m² STC
+
+    # Normalise effective irradiance by the STC reference (1000 W/m² → 8 kWh/m²/day)
+    max_eff_irr = REF_GHI / 1000.0 * 8.0   # ≈ 8.0 kWh/m²/day (theoretical max)
+
+    solar_gen = (
+        CAPACITY
+        * EFFICIENCY
+        * df["performance_ratio"]
+        * (df["effective_irradiance"] / max_eff_irr)
+        * df["temperature_factor"]
+        * df["cloud_factor"]
+    )
+
+    return solar_gen.clip(0, CAPACITY)
+
+
+# ---------------------------------------------------------------------------
+# 5. Wind Power-Curve Model
+# ---------------------------------------------------------------------------
+def calculate_wind_generation(df: pd.DataFrame, cfg: dict) -> pd.Series:
+    """
+    Classic 3-region wind turbine power curve:
+      Region 1 (<cut-in)  → 0 MW
+      Region 2 (cut-in … rated) → cubic ramp
+      Region 3 (rated … cut-out) → rated power
+      Region 4 (>cut-out) → 0 MW (safety shutdown)
+    """
+    wind_cfg   = cfg["wind"]
+    CAPACITY   = wind_cfg["installed_capacity_mw"]
+    EFFICIENCY = wind_cfg["efficiency"]
+    V_CI       = wind_cfg["cut_in_speed_ms"]
+    V_R        = wind_cfg["rated_speed_ms"]
+    V_CO       = wind_cfg["cut_out_speed_ms"]
+
+    v = df["wind_speed_ms"].clip(lower=0)
+    wind_gen = pd.Series(0.0, index=df.index)
+
+    # Region 2: cubic ramp
+    mask_r2 = (v >= V_CI) & (v < V_R)
+    wind_gen[mask_r2] = (
+        ((v[mask_r2] - V_CI) / (V_R - V_CI)) ** 3
+        * CAPACITY * EFFICIENCY
+    )
+
+    # Region 3: rated output
+    mask_r3 = (v >= V_R) & (v <= V_CO)
+    wind_gen[mask_r3] = CAPACITY * EFFICIENCY
+
+    return wind_gen.clip(0, CAPACITY)
+
+
+# ---------------------------------------------------------------------------
+# 6. Assemble Generation Dataframe
+# ---------------------------------------------------------------------------
+def generate_total_output(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    logger.info("Calculating Solar Generation (pvlib-informed)…")
+    df["solar_generation_mw"] = calculate_solar_generation(df, cfg)
+
+    logger.info("Calculating Wind Generation (power-curve)…")
+    df["wind_generation_mw"] = calculate_wind_generation(df, cfg)
+
+    logger.info("Calculating Total Generation…")
+    df["total_generation_mw"] = df["solar_generation_mw"] + df["wind_generation_mw"]
+
+    # Capacity Factor = Actual / Installed
+    total_installed = cfg["solar"]["installed_capacity_mw"] + cfg["wind"]["installed_capacity_mw"]
+    df["capacity_factor"] = (df["total_generation_mw"] / total_installed).clip(0, 1)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+# 7. Validation
+# ---------------------------------------------------------------------------
+def validate_generation_data(df: pd.DataFrame, cfg: dict) -> bool:
+    """
+    Enforce hard physics constraints before persisting data.
+    """
+    logger.info("Running validation checks…")
+    solar_cap = cfg["solar"]["installed_capacity_mw"]
+    wind_cap  = cfg["wind"]["installed_capacity_mw"]
+
+    gen_cols = ["solar_generation_mw", "wind_generation_mw", "total_generation_mw"]
+    pv_cols  = [
+        "effective_irradiance", "cell_temperature_c",
+        "temperature_factor", "cloud_factor", "performance_ratio", "capacity_factor"
+    ]
+
+    # No nulls
+    if df[gen_cols + pv_cols].isnull().any().any():
+        logger.error("Validation Failed: Null values in engineered columns.")
         return False
-        
-    # Check for negative values
+
+    # No negative generation
     if (df[gen_cols] < 0).any().any():
         logger.error("Validation Failed: Negative generation values detected.")
         return False
-        
-    # Check solar capacity constraints
-    if (df['solar_generation_mw'] > SOLAR_CAPACITY_MW).any():
-        logger.error("Validation Failed: Solar generation exceeds installed capacity.")
+
+    # Capacity ceilings
+    if (df["solar_generation_mw"] > solar_cap).any():
+        logger.error("Validation Failed: Solar exceeds installed capacity.")
         return False
-        
-    # Check wind capacity constraints
-    if (df['wind_generation_mw'] > WIND_CAPACITY_MW).any():
-        logger.error("Validation Failed: Wind generation exceeds installed capacity.")
+    if (df["wind_generation_mw"] > wind_cap).any():
+        logger.error("Validation Failed: Wind exceeds installed capacity.")
         return False
-        
-    logger.info("Data validation passed successfully.")
+
+    # Cloud factor ∈ [0, 1]
+    if ((df["cloud_factor"] < 0) | (df["cloud_factor"] > 1)).any():
+        logger.error("Validation Failed: Cloud factor out of [0, 1] bounds.")
+        return False
+
+    # Temperature factor ∈ [0.70, 1.05]
+    if ((df["temperature_factor"] < 0.70) | (df["temperature_factor"] > 1.05)).any():
+        logger.error("Validation Failed: Temperature factor out of physical limits.")
+        return False
+
+    logger.info("All validation checks passed ✓")
     return True
 
+
+# ---------------------------------------------------------------------------
+# 8. Save Output
+# ---------------------------------------------------------------------------
 def save_generation_data(df: pd.DataFrame) -> None:
     """
-    Save the final dataframe containing the calculated generation data to data/processed.
+    Persist generation + all PV engineered features to data/processed/.
+    All downstream ML models consume this file.
     """
-    try:
-        # Isolate the output columns required by the project specifications
-        output_cols = ['date', 'solar_generation_mw', 'wind_generation_mw', 'total_generation_mw', 'site_name']
-        output_df = df[output_cols]
-        
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        processed_dir = os.path.join(root_dir, "data", "processed")
-        
-        # Ensure directory exists
-        os.makedirs(processed_dir, exist_ok=True)
-        
-        file_path = os.path.join(processed_dir, "khavda_generation.csv")
-        output_df.to_csv(file_path, index=False)
-        logger.info(f"Generation data successfully saved to {file_path}")
-        
-    except Exception as e:
-        logger.error(f"Error saving generation data: {e}")
-        raise
+    output_cols = [
+        "date", "site_name",
+        "solar_generation_mw", "wind_generation_mw", "total_generation_mw",
+        # PV engineered features (consumed by ML feature_engineering)
+        "ghi_w_m2", "effective_irradiance", "cloud_factor",
+        "cell_temperature_c", "temperature_factor",
+        "performance_ratio", "capacity_factor",
+    ]
+    # site_name may be absent in some weather CSVs — add a default
+    if "site_name" not in df.columns:
+        df["site_name"] = "Khavda"
 
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    df[output_cols].to_csv(OUTPUT_PATH, index=False)
+    logger.info(f"Generation data saved → {OUTPUT_PATH}")
+
+
+# ---------------------------------------------------------------------------
+# 9. Main Orchestration
+# ---------------------------------------------------------------------------
 def main() -> None:
-    """
-    Main orchestration function for the Weather-Driven Renewable Generation Modeling Engine.
-    """
-    logger.info("Starting Khavda Renewable Generation Modeling Engine...")
-    
+    logger.info("=" * 60)
+    logger.info("Physics-Informed PV Generation Engine — Starting")
+    logger.info("=" * 60)
+
     try:
-        # 1. Extract Data
-        df = load_weather_data()
-        
-        # 2. Transform (Apply Engineering Models)
-        df = generate_total_output(df)
-        
-        # 3. Validate
-        if validate_generation_data(df):
-            # 4. Load (Save Data)
+        cfg = load_config()
+        df  = load_weather_data()
+        df  = engineer_pv_features(df, cfg)
+        df  = generate_total_output(df, cfg)
+
+        if validate_generation_data(df, cfg):
             save_generation_data(df)
         else:
-            logger.error("Pipeline execution halted due to data validation failures.")
-            
-    except Exception as e:
-        logger.error(f"Pipeline failed: {e}")
-        
-    logger.info("Generation Modeling Engine Completed.")
+            logger.error("Pipeline halted — validation failed.")
+
+    except Exception as exc:
+        logger.exception(f"Pipeline failed: {exc}")
+        raise
+
+    logger.info("Physics-Informed PV Generation Engine — Completed ✓")
+
 
 if __name__ == "__main__":
     main()

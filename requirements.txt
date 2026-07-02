@@ -11,3 +11,5 @@ playwright
 pdfplumber
 SQLAlchemy
 psycopg2-binary
+pvlib
+pyyaml

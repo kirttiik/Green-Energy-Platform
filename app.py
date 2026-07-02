@@ -460,6 +460,60 @@ def render_generation_analytics():
         
     st.markdown("---")
     
+    # 1b. PV Performance Panel — reads from the physics-informed generation CSV
+    st.subheader("🔬 PV Performance Panel (Physics-Informed)")
+    
+    ROOT = os.path.dirname(os.path.abspath(__file__))
+    gen_path = os.path.join(ROOT, 'data', 'processed', 'khavda_generation.csv')
+    
+    pv_cols = ['effective_irradiance', 'cell_temperature_c', 'temperature_factor',
+               'cloud_factor', 'performance_ratio', 'capacity_factor']
+    
+    if os.path.exists(gen_path):
+        df_gen = pd.read_csv(gen_path)
+        pv_available = [c for c in pv_cols if c in df_gen.columns]
+        
+        if pv_available:
+            latest = df_gen.iloc[-1]
+            p1, p2, p3, p4, p5, p6 = st.columns(6)
+            
+            eff_irr = latest.get('effective_irradiance', 0)
+            cell_t  = latest.get('cell_temperature_c', 0)
+            t_fac   = latest.get('temperature_factor', 1)
+            c_fac   = latest.get('cloud_factor', 1)
+            pr      = latest.get('performance_ratio', 0.82)
+            cf      = latest.get('capacity_factor', 0)
+            
+            p1.metric("Effective Irradiance", f"{eff_irr:.2f} kWh/m²/d",
+                      help="GHI × Cloud Factor — actual solar energy reaching PV modules")
+            p2.metric("PV Cell Temperature", f"{cell_t:.1f} °C",
+                      delta=f"{cell_t - 25:.1f} °C vs STC", delta_color="inverse",
+                      help="pvlib Faiman model — operating temperature of PV cells")
+            p3.metric("Temperature Factor", f"{t_fac:.4f}",
+                      delta=f"{(t_fac - 1)*100:.2f}% efficiency",
+                      delta_color="inverse",
+                      help="γ·ΔT derating — efficiency loss from cell overheating")
+            p4.metric("Cloud Factor", f"{c_fac:.3f}",
+                      help="1 − Cloud_Cover/100 — direct cloud attenuation factor")
+            p5.metric("Performance Ratio", f"{pr:.2f}",
+                      help="System PR = 0.82 — inverter, cable, dust, mismatch losses")
+            p6.metric("Capacity Factor", f"{cf:.3f}",
+                      help="Actual / Installed Capacity — fleet utilisation rate")
+        else:
+            st.info("PV engineered features not yet in generation CSV. Re-run the pipeline after upgrading to pvlib engine.")
+    else:
+        # Demo values when no CSV exists yet
+        p1, p2, p3, p4, p5, p6 = st.columns(6)
+        p1.metric("Effective Irradiance", "5.84 kWh/m²/d")
+        p2.metric("PV Cell Temperature", "52.3 °C", "+27.3 °C vs STC", delta_color="inverse")
+        p3.metric("Temperature Factor", "0.8908", "-10.9% efficiency", delta_color="inverse")
+        p4.metric("Cloud Factor", "0.730")
+        p5.metric("Performance Ratio", "0.82")
+        p6.metric("Capacity Factor", "0.312")
+        st.caption("⚠ Demo data — run the pvlib generation pipeline to display live values.")
+    
+    st.markdown("---")
+    
     # Generate Dummy Time-Series Data
     import numpy as np
     import datetime
@@ -558,9 +612,25 @@ def render_generation_analytics():
     else:
         st.success("No significant deviations detected in the operational window.")
 
+
+
 def render_forecasting():
     st.title("🔮 AI Forecasting & Predictive Intelligence")
     st.markdown("Day-Ahead and Week-Ahead generation projections powered by XGBoost.")
+    
+    # Pipeline Chain Banner
+    st.markdown("""
+    <div style="background-color:#1a1a2e;padding:12px 20px;border-radius:8px;border-left:4px solid #F1C40F;margin-bottom:16px;">
+    <span style="color:#F1C40F;font-weight:bold;">⚙️ Inference Chain: </span>
+    <span style="color:#BDC3C7;">pvlib Physics Engine (GHI → Effective Irradiance → Cell Temp)</span>
+    <span style="color:#F1C40F;"> → </span>
+    <span style="color:#BDC3C7;">Feature Engineering (PR · Cloud Factor · Temp Factor)</span>
+    <span style="color:#F1C40F;"> → </span>
+    <span style="color:#2ECC71;font-weight:bold;">XGBoost Correction</span>
+    <span style="color:#F1C40F;"> → </span>
+    <span style="color:#3498DB;font-weight:bold;">Final Forecast (MW)</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 1. Page Header & AI Health Pulse
     c1, c2, c3, c4 = st.columns(4)

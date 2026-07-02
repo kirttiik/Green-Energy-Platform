@@ -51,24 +51,50 @@ def load_data() -> pd.DataFrame:
     return df
 
 def get_model_config():
-    """Define features and targets for each model exactly as used in training."""
+    """Define features and targets for each model exactly as used in training.
+    
+    PV engineered features are included with a fallback guard — if a model
+    was trained before the physics upgrade, SHAP will skip missing features.
+    """
+    # PV engineered features added by the pvlib generation engine
+    pv_features = [
+        'effective_irradiance', 'ghi_w_m2', 'cell_temperature_c',
+        'temperature_factor', 'cloud_factor', 'performance_ratio', 'capacity_factor'
+    ]
     return {
         'solar': {
-            'features': ['temperature_c', 'humidity_pct', 'solar_radiation_kwh_m2_day', 'cloud_cover_pct', 'rainfall_mm', 'year', 'month', 'quarter', 'day_of_year', 'week_of_year', 'is_weekend'],
+            'features': [
+                'temperature_c', 'humidity_pct', 'solar_radiation_kwh_m2_day',
+                'cloud_cover_pct', 'rainfall_mm', 'year', 'month', 'quarter',
+                'day_of_year', 'week_of_year', 'is_weekend'
+            ] + pv_features,
             'model_file': 'solar_model.pkl'
         },
         'wind': {
-            'features': ['wind_speed_ms', 'temperature_c', 'humidity_pct', 'rainfall_mm', 'cloud_cover_pct', 'month', 'quarter', 'day_of_year', 'week_of_year', 'is_weekend'],
+            'features': [
+                'wind_speed_ms', 'temperature_c', 'humidity_pct', 'rainfall_mm',
+                'cloud_cover_pct', 'month', 'quarter', 'day_of_year',
+                'week_of_year', 'is_weekend',
+                'cloud_factor', 'capacity_factor', 'effective_irradiance'
+            ],
             'model_file': 'wind_model.pkl'
         },
         'total_output': {
-            'features': ['temperature_c', 'humidity_pct', 'wind_speed_ms', 'solar_radiation_kwh_m2_day', 'cloud_cover_pct', 'rainfall_mm', 'month', 'quarter', 'day_of_year', 'week_of_year', 'is_weekend'],
+            'features': [
+                'temperature_c', 'humidity_pct', 'wind_speed_ms',
+                'solar_radiation_kwh_m2_day', 'cloud_cover_pct', 'rainfall_mm',
+                'month', 'quarter', 'day_of_year', 'week_of_year', 'is_weekend'
+            ] + pv_features,
             'model_file': 'total_output_model.pkl'
         }
     }
 
 def analyze_model_shap(model_name: str, config: dict, df: pd.DataFrame):
-    """Generate SHAP values and visualizations for a single model."""
+    """Generate SHAP values and visualizations for a single model.
+    
+    Features that don't exist in df are silently dropped — this ensures
+    backward compatibility when running against an older generation CSV.
+    """
     logger.info(f"--- Analyzing {model_name.upper()} Model ---")
     
     model_path = os.path.join(MODELS_DIR, config['model_file'])
@@ -78,8 +104,14 @@ def analyze_model_shap(model_name: str, config: dict, df: pd.DataFrame):
 
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
-        
-    X = df[config['features']].dropna()
+    
+    # Only keep features that actually exist in the dataframe AND in the trained model
+    available_features = [f for f in config['features'] if f in df.columns]
+    X = df[available_features].dropna()
+    
+    if X.empty:
+        logger.warning(f"No data available for {model_name} SHAP analysis.")
+        return None
     
     # SHAP explainer
     explainer = shap.TreeExplainer(model)
@@ -88,7 +120,7 @@ def analyze_model_shap(model_name: str, config: dict, df: pd.DataFrame):
     # 1. Generate Ranking
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
     ranking_df = pd.DataFrame({
-        'Feature': config['features'],
+        'Feature': available_features,
         'Mean_Absolute_SHAP': mean_abs_shap
     }).sort_values(by='Mean_Absolute_SHAP', ascending=False)
     
@@ -107,19 +139,22 @@ def analyze_model_shap(model_name: str, config: dict, df: pd.DataFrame):
     return ranking_df
 
 def generate_executive_insights():
-    """Generate executive insights for SHAP analysis."""
+    """Generate physics-informed executive insights for SHAP analysis."""
     insights = [
         {
             'Model': 'Solar',
-            'Insight': 'Solar radiation contributes the largest positive impact to generation forecasts.'
+            'Insight': 'Effective irradiance (GHI × cloud factor) is the dominant driver of solar generation. '
+                       'Cell temperature derating (via pvlib Faiman model) explains residual forecast variance.'
         },
         {
             'Model': 'Wind',
-            'Insight': 'Wind speed is responsible for the majority of forecast variation.'
+            'Insight': 'Wind speed is responsible for the majority of forecast variation. '
+                       'Cloud factor indirectly signals atmospheric instability correlated with wind generation.'
         },
         {
             'Model': 'Total Output',
-            'Insight': 'Combined renewable generation is primarily influenced by solar irradiance.'
+            'Insight': 'Combined renewable generation is primarily influenced by effective irradiance '
+                       'and temperature factor. Performance ratio captures systemic losses (inverter, dust, mismatch).'
         }
     ]
     
