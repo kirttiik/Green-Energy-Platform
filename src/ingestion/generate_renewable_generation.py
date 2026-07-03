@@ -64,6 +64,21 @@ def load_config() -> dict:
     """Load plant parameters from config/plant_config.yaml."""
     with open(CONFIG_PATH, "r") as f:
         cfg = yaml.safe_load(f)
+        
+    # --- Configuration Validation ---
+    s = cfg.get("solar", {})
+    w = cfg.get("wind", {})
+    if s.get("installed_capacity_mw", 0) <= 0 or w.get("installed_capacity_mw", 0) <= 0:
+        logger.warning("Config Validation: Installed capacity must be > 0.")
+    if not (0 < s.get("performance_ratio", 0) <= 1):
+        logger.warning("Config Validation: Invalid performance ratio.")
+    if s.get("temperature_coefficient") is None:
+        logger.warning("Config Validation: Missing temperature coefficient.")
+    if s.get("noct_c") is None:
+        logger.warning("Config Validation: Missing NOCT.")
+    if w.get("cut_in_speed_ms") is None or w.get("cut_out_speed_ms") is None:
+        logger.warning("Config Validation: Missing wind cut-in/cut-out speeds.")
+
     logger.info(f"Loaded plant config: {cfg['site']['name']}")
     return cfg
 
@@ -142,6 +157,45 @@ def engineer_pv_features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 
     # --- 3f. Performance Ratio (constant, stored as a column for ML) -------------
     df["performance_ratio"] = PR
+
+    # --- 3g. Advanced PV Engineering Features (pvlib) ----------------------------
+    if HAS_PVLIB:
+        lat = cfg["site"]["latitude"]
+        lon = cfg["site"]["longitude"]
+        tz = "Asia/Kolkata"
+        
+        # Representative time for daily data (e.g., solar noon ~12:30 local)
+        dt_idx = pd.DatetimeIndex(df["date"]).tz_localize(tz) + pd.Timedelta(hours=12, minutes=30)
+        
+        solpos = pvlib.solarposition.get_solarposition(dt_idx, lat, lon)
+        df["solar_zenith"] = solpos["zenith"].values
+        df["solar_elevation"] = solpos["elevation"].values
+        df["solar_azimuth"] = solpos["azimuth"].values
+
+        df["air_mass"] = pvlib.atmosphere.get_relative_airmass(df["solar_zenith"]).fillna(1.5)
+
+        cs = pvlib.clearsky.ineichen(dt_idx, lat, lon, linke_turbidity=3.0)
+        df["clear_sky_irradiance_kwh_m2_day"] = cs["ghi"].values * 8.0 / 1000.0
+
+        tilt = solar_cfg.get("tilt_degrees", 20)
+        azimuth = solar_cfg.get("azimuth_degrees", 180)
+        poa = pvlib.irradiance.get_total_irradiance(
+            surface_tilt=tilt,
+            surface_azimuth=azimuth,
+            solar_zenith=df["solar_zenith"],
+            solar_azimuth=df["solar_azimuth"],
+            dni=cs["dni"].values, 
+            ghi=df["ghi_w_m2"],
+            dhi=cs["dhi"].values
+        )
+        df["poa_irradiance_w_m2"] = poa["poa_global"].values
+    else:
+        df["solar_zenith"] = 45.0
+        df["solar_elevation"] = 45.0
+        df["solar_azimuth"] = 180.0
+        df["air_mass"] = 1.5
+        df["clear_sky_irradiance_kwh_m2_day"] = df["solar_radiation_kwh_m2_day"]
+        df["poa_irradiance_w_m2"] = df["ghi_w_m2"]
 
     logger.info("PV feature engineering complete.")
     return df
@@ -247,7 +301,9 @@ def validate_generation_data(df: pd.DataFrame, cfg: dict) -> bool:
     gen_cols = ["solar_generation_mw", "wind_generation_mw", "total_generation_mw"]
     pv_cols  = [
         "effective_irradiance", "cell_temperature_c",
-        "temperature_factor", "cloud_factor", "performance_ratio", "capacity_factor"
+        "temperature_factor", "cloud_factor", "performance_ratio", "capacity_factor",
+        "solar_zenith", "solar_elevation", "solar_azimuth", "air_mass",
+        "clear_sky_irradiance_kwh_m2_day", "poa_irradiance_w_m2"
     ]
 
     # No nulls
@@ -297,6 +353,8 @@ def save_generation_data(df: pd.DataFrame) -> None:
         "ghi_w_m2", "effective_irradiance", "cloud_factor",
         "cell_temperature_c", "temperature_factor",
         "performance_ratio", "capacity_factor",
+        "solar_zenith", "solar_elevation", "solar_azimuth", "air_mass",
+        "clear_sky_irradiance_kwh_m2_day", "poa_irradiance_w_m2"
     ]
     # site_name may be absent in some weather CSVs — add a default
     if "site_name" not in df.columns:

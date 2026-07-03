@@ -1,6 +1,6 @@
 Metric,Value
 Train R2,1.0
-Test R2,0.9933
+Test R2,0.998
 Best Feature,wind_speed_ms
 Model Type,XGBoost
 Training Records,1385

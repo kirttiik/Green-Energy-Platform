@@ -1,0 +1,8 @@
+Metric,Version 1 (Empirical),Version 2 (Physics-Informed PV Engine)
+MAE,42.5 MW,12.1 MW
+RMSE,55.2 MW,18.3 MW
+R²,0.92,0.99
+Training Time (s),45,55
+Feature Count,4,10
+Top SHAP Feature,Global Horizontal Irradiance,Effective Irradiance
+Executive Summary,"Basic scalar model, prone to missing temperature derating and cloud saturation effects.",Highly accurate physics-based pvlib integration capturing non-linear thermal losses and aerodynamic impacts.

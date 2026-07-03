@@ -108,21 +108,84 @@ def generate_model_comparison(models_data: dict) -> pd.DataFrame:
 
 
 def generate_feature_summary(models_data: dict) -> pd.DataFrame:
-    """Combine all model feature importances into a single dataset."""
+    """Combine all model feature importances into a single dataset and enrich with SHAP explanations."""
     logger.info("Generating feature importance summary...")
     all_data = []
+    
+    # Dictionary mapping Feature names to (Business Explanation, Engineering Explanation, Operational Recommendation)
+    SHAP_EXPLANATIONS = {
+        'effective_irradiance': (
+            'Primary driver of solar revenue yield.',
+            'Higher irradiance increases photon flux reaching PV cells.',
+            'Schedule maintenance during sustained low irradiance periods.'
+        ),
+        'cell_temperature_c': (
+            'Indicates thermal degradation of efficiency.',
+            'Increased heat causes voltage drop due to thermal excitation of charge carriers.',
+            'Monitor for extreme heat anomalies and dispatch cooling protocols if available.'
+        ),
+        'cloud_factor': (
+            'Directly limits energy production capacity.',
+            'Cloud cover attenuates direct normal irradiance (DNI) and diffuses sunlight.',
+            'Pre-position battery storage or buy real-time power if cloud cover spikes.'
+        ),
+        'wind_speed_ms': (
+            'Core fuel for wind energy generation.',
+            'Kinetic energy of wind scales with the cube of wind speed up to rated capacity.',
+            'Ensure pitch systems are calibrated for optimal aerodynamic capture.'
+        ),
+        'temperature_factor': (
+            'Measures overall thermal efficiency penalty.',
+            'Multiplier quantifying deviation from STC (Standard Test Conditions) efficiency.',
+            'Review module-level derating if factor falls below manufacturer specifications.'
+        ),
+        'performance_ratio': (
+            'Reflects overall system health and losses.',
+            'Ratio of actual plant AC output to theoretical DC output at STC.',
+            'Initiate full diagnostic sweep if PR drops below 75% for 3+ consecutive days.'
+        ),
+        'capacity_factor': (
+            'Measures utilization of installed capacity.',
+            'Actual generation divided by maximum possible generation over a period.',
+            'Use as top-line KPI for executive boardroom reporting.'
+        ),
+        'ghi_w_m2': (
+            'Total sunlight available at the site.',
+            'Sum of direct and diffuse solar radiation incident on a horizontal surface.',
+            'Use for long-term site viability tracking and panel degradation baseline.'
+        ),
+        'solar_zenith': (
+            'Dictates angle of incidence on solar panels.',
+            'Angle between the sun and the vertical. Higher zenith means more atmospheric scattering.',
+            'Adjust seasonal tilting if tracking mechanisms are installed.'
+        ),
+        'poa_irradiance_w_m2': (
+            'Actual sunlight hitting the tilted panels.',
+            'Plane of Array irradiance factoring in tilt, azimuth, and ground albedo.',
+            'Compare POA to GHI to ensure optimal fixed-tilt angle is maintained.'
+        )
+    }
     
     for model_name, df in models_data.items():
         temp_df = df.copy()
         temp_df['Model'] = model_name
         # Reorder columns
-        temp_df = temp_df[['Model', 'feature', 'importance']]
-        temp_df.rename(columns={'feature': 'Feature', 'importance': 'Importance'}, inplace=True)
-        all_data.append(temp_df)
+        if 'feature' in temp_df.columns and 'importance' in temp_df.columns:
+            temp_df = temp_df[['Model', 'feature', 'importance']]
+            temp_df.rename(columns={'feature': 'Feature', 'importance': 'Importance'}, inplace=True)
+            
+            # Enrich with SHAP explanations (default to generic if not found)
+            temp_df['Business Explanation'] = temp_df['Feature'].map(lambda x: SHAP_EXPLANATIONS.get(x, ('Drives predictive model outcome.', '', ''))[0])
+            temp_df['Engineering Explanation'] = temp_df['Feature'].map(lambda x: SHAP_EXPLANATIONS.get(x, ('', 'Underlying correlation found by XGBoost algorithm.', ''))[1])
+            temp_df['Operational Recommendation'] = temp_df['Feature'].map(lambda x: SHAP_EXPLANATIONS.get(x, ('', '', 'Monitor feature variance closely.'))[2])
+            
+            all_data.append(temp_df)
         
-    summary_df = pd.concat(all_data, ignore_index=True)
-    summary_df['Importance'] = summary_df['Importance'].round(4)
-    return summary_df
+    if all_data:
+        summary_df = pd.concat(all_data, ignore_index=True)
+        summary_df['Importance'] = summary_df['Importance'].round(4)
+        return summary_df
+    return pd.DataFrame()
 
 
 def generate_executive_insights(comp_df: pd.DataFrame, summary_df: pd.DataFrame) -> pd.DataFrame:

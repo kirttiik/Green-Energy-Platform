@@ -39,11 +39,13 @@ PIPELINE_STEPS = [
     ("src/forecasting/solar_model.py",                  True),
     ("src/forecasting/wind_model.py",                   True),
     ("src/forecasting/total_output_model.py",           True),
+    ("src/analytics/forecast_confidence.py",            False),
 
     # ── Hourly Forecast Ingestion (after models) ───────────────────────────
     ("src/ingestion/open_meteo_hourly_ingestion.py",    False),
 
     # ── Analytics Layer (Non-Critical — failures logged but continue) ──────
+    ("src/analytics/pv_engine_analytics.py",            False),
     ("src/analytics/carbon_offset.py",                  False),
     ("src/analytics/weather_risk.py",                   False),
     ("src/analytics/iex_analytics.py",                  False),
