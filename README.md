@@ -77,10 +77,10 @@ flowchart TD
 * **Business Value:** Provides the raw operational ground-truth required for forecasting.
 
 ### 2. Generation Simulation Engine (`generate_renewable_generation.py`)
-* **Purpose:** Synthesizes realistic MW generation figures based on physical capacity and meteorological physics.
+* **Purpose:** Synthesizes realistic MW generation figures utilizing a Physics-Informed engine (`pvlib`) for solar and advanced aerodynamic models for wind.
 * **Inputs:** Raw weather data (Radiation, Wind Speed, Temperature).
-* **Outputs:** Base historical generation dataset.
-* **Business Value:** Backfills missing SCADA data to allow historical machine learning modeling.
+* **Outputs:** Physics-enriched generation dataset (Effective Irradiance, Cell Temp, PR).
+* **Business Value:** Provides an engineering-grade theoretical baseline to compare against actual SCADA output.
 
 ### 3. Solar Forecast Model (`solar_model.py`)
 * **Purpose:** Predicts solar generation utilizing engineered temporal variables and radiation metrics.
@@ -124,9 +124,15 @@ flowchart TD
 * **Outputs:** Plain-English dynamic insights (e.g., *"Cloud cover will reduce solar generation"*).
 * **Business Value:** Builds stakeholder trust in AI decision-making.
 
-### 10. Executive Summary Engine (`executive_summary.py`)
+### 10. Grid Intelligence & DSM Analytics (`nldc_grid_scraper.py`)
+* **Purpose:** Connects to the National Load Despatch Centre (NLDC) to monitor live grid frequency.
+* **Inputs:** NLDC live telemetry data.
+* **Outputs:** Grid frequency profiles and Deviation Settlement Mechanism (DSM) penalty simulations.
+* **Business Value:** Protects the company from severe regulatory fines during grid instability by recommending real-time dispatch adjustments.
+
+### 11. Executive Summary Engine (`executive_summary.py`)
 * **Purpose:** Stitches all decentralized pipelines into one finalized intelligence layer.
-* **Inputs:** Outputs from all 9 previous modules.
+* **Inputs:** Outputs from all previous modules.
 * **Outputs:** A flattened, BI-ready master dataset and automated textual executive narratives.
 * **Business Value:** Feeds enterprise dashboards directly, requiring zero manual analyst intervention.
 
@@ -192,11 +198,12 @@ energy-market-intelligence-platform/
 ## 🚀 Future Roadmap (Phase 2)
 
 - [ ] **PostgreSQL Integration:** Migrate flat-file outputs into a structured, relational data warehouse.
-- [ ] **Streamlit Dashboard:** Deploy an interactive, web-based tool for operational engineers.
+- [x] **Streamlit Dashboard:** Deploy an interactive, web-based tool for operational engineers.
 - [ ] **Power BI Dashboard:** Build executive-level financial and sustainability visual reports.
-- [ ] **SHAP Explainability:** Deepen the AI Explainability engine utilizing mathematically rigorous Shapley values.
+- [x] **SHAP Explainability:** Deepen the AI Explainability engine utilizing mathematically rigorous Shapley values.
 - [ ] **Real-Time Forecasting:** Connect to live telemetry APIs rather than static historical batches.
-- [ ] **IEX Market Integration:** Pull live market clearing prices from the Indian Energy Exchange to dynamically optimize revenue.
+- [x] **IEX Market Integration:** Pull live market clearing prices from the Indian Energy Exchange to dynamically optimize revenue.
+- [x] **Grid Compliance:** Integrate NLDC grid frequency monitoring to proactively avoid DSM penalties.
 
 ---
 
