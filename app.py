@@ -175,33 +175,6 @@ with st.sidebar:
     ]
     selection = st.radio("Navigate to", sections, label_visibility="collapsed")
     
-    st.markdown("---")
-    global_time_horizon = st.radio(
-        "⏱️ Time Horizon",
-        ["All Time", "Yesterday", "Today", "Tomorrow", "📅 Custom Range"],
-        index=0,
-        help="Filter data by time period. Custom Range lets you pick exact dates."
-    )
-    
-    # Custom date range pickers (only shown when Custom Range is selected)
-    custom_start_date = None
-    custom_end_date   = None
-    if global_time_horizon == "📅 Custom Range":
-        import datetime as dt
-        today_sys = dt.date.today()
-        default_start = today_sys - dt.timedelta(days=30)
-        date_range = st.date_input(
-            "Select Date Range",
-            value=(default_start, today_sys),
-            min_value=dt.date(2021, 1, 1),
-            max_value=today_sys + dt.timedelta(days=14),
-            key="custom_date_range"
-        )
-        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-            custom_start_date, custom_end_date = date_range
-        elif isinstance(date_range, dt.date):
-            custom_start_date = custom_end_date = date_range
-    
     sidebar_status_bar(ROOT_DIR)
 
 
@@ -220,6 +193,36 @@ hourly_data = load_hourly_data()
 
 # Single-day horizons that should show hourly charts
 SINGLE_DAY_HORIZONS = {"Yesterday", "Today", "Tomorrow"}
+
+def get_time_horizon():
+    global_time_horizon = st.radio(
+        "⏱️ Time Horizon",
+        ["All Time", "Yesterday", "Today", "Tomorrow", "📅 Custom Range"],
+        index=0,
+        horizontal=True,
+        help="Filter data by time period. Custom Range lets you pick exact dates."
+    )
+    
+    custom_start_date = None
+    custom_end_date   = None
+    if global_time_horizon == "📅 Custom Range":
+        import datetime as dt
+        today_sys = dt.date.today()
+        default_start = today_sys - dt.timedelta(days=30)
+        date_range = st.date_input(
+            "Select Date Range",
+            value=(default_start, today_sys),
+            min_value=dt.date(2021, 1, 1),
+            max_value=today_sys + dt.timedelta(days=14),
+            key="custom_date_range_main"
+        )
+        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+            custom_start_date, custom_end_date = date_range
+        elif isinstance(date_range, dt.date):
+            custom_start_date = custom_end_date = date_range
+            
+    st.markdown("---")
+    return global_time_horizon, custom_start_date, custom_end_date
 
 def filter_by_time_horizon(df, horizon, custom_start=None, custom_end=None):
     """Filters a DataFrame by date relative to the last actual historical observation."""
@@ -876,6 +879,8 @@ def render_carbon_analytics():
         }
     )
     
+    global_time_horizon, custom_start_date, custom_end_date = get_time_horizon()
+    
     df_carb = filter_by_time_horizon(data['carbon'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_carb.empty:
         total_co2 = df_carb['co2_avoided_tons'].sum()
@@ -1258,6 +1263,8 @@ def render_iex_analytics():
             "Revenue Scenario Simulator": "Allows you to test 'what-if' scenarios on price and generation.",
         }
     )
+    
+    global_time_horizon, custom_start_date, custom_end_date = get_time_horizon()
 
     iex_d = load_iex_data()
     iex      = iex_d['iex']
@@ -1666,7 +1673,8 @@ def render_grid_analytics():
             "DSM Penalty": "Deviation Settlement Mechanism charges for over-injection during high frequency or under-injection during low frequency.",
         }
     )
-    st.markdown("---")
+    
+    global_time_horizon, custom_start_date, custom_end_date = get_time_horizon()
 
     ROOT = os.path.dirname(os.path.abspath(__file__))
     grid_path = os.path.join(ROOT, 'data', 'grid', 'nldc_grid_frequency.csv')
