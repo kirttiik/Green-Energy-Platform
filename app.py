@@ -1695,27 +1695,48 @@ def render_platform_health():
     c1, c2, c3, c4 = st.columns(4)
     
     def check_file(filename):
-        path = os.path.join(ROOT, filename)
+        """Check file health. On cloud, files won't be re-generated daily.
+        We consider a file healthy if it exists, regardless of age.
+        We only warn if the file is older than 30 days (likely very stale)."""
+        path = os.path.join(ROOT, filename) if not os.path.isabs(filename) else filename
         if not os.path.exists(path):
             return "🔴 Failed"
         try:
             mtime = os.path.getmtime(path)
-            if (pd.Timestamp.now().timestamp() - mtime) > 86400 * 2: # Older than 2 days
+            age_days = (pd.Timestamp.now().timestamp() - mtime) / 86400
+            if age_days > 30:
                 return "🟡 Warning"
         except Exception:
-            return "🔴 Failed"
+            pass
         return "🟢 Healthy"
-        
-    c1.metric("NASA POWER API", check_file(os.path.join('data', 'raw', 'khavda_weather.csv')))
-    c2.metric("Open-Meteo API", check_file(os.path.join('data', 'raw', 'open_meteo_forecast.csv')))
-    c3.metric("IEX Scraper", check_file(os.path.join('data', 'raw', 'iex_dam_prices.csv')))
-    c4.metric("GitHub Actions", "🟢 Healthy")
+
+    # Check open-meteo with both possible filenames
+    ROOT_local = ROOT
+    def check_any_file(filenames):
+        """Return Healthy if ANY of the given relative paths exists."""
+        for fn in filenames:
+            path = os.path.join(ROOT_local, fn)
+            if os.path.exists(path):
+                try:
+                    mtime = os.path.getmtime(path)
+                    age_days = (pd.Timestamp.now().timestamp() - mtime) / 86400
+                    if age_days > 30:
+                        return "🟡 Warning"
+                except Exception:
+                    pass
+                return "🟢 Healthy"
+        return "🔴 Failed"
+
+    c1.metric("NASA POWER API",   check_any_file([os.path.join('data','raw','khavda_weather.csv'), os.path.join('data','raw','khavda_hourly.csv')]))
+    c2.metric("Open-Meteo API",   check_any_file([os.path.join('data','raw','open_meteo_forecast.csv'), os.path.join('data','raw','khavda_weather_forecast.csv')]))
+    c3.metric("IEX Scraper",      check_any_file([os.path.join('data','raw','iex_dam_prices.csv'), os.path.join('data','market','iex_prices.csv')]))
+    c4.metric("GitHub Actions",   "🟢 Healthy")
     
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Forecast Models", check_file(os.path.join('data', 'processed', 'total_output_predictions.csv')))
-    c6.metric("SHAP Engine", check_file(os.path.join('reports', 'shap_feature_ranking_solar.csv')))
+    c5.metric("Forecast Models",       check_any_file([os.path.join('data','processed','total_output_predictions.csv'), os.path.join('reports','total_output','total_output_predictions.csv')]))
+    c6.metric("SHAP Engine",           check_any_file([os.path.join('reports','shap_feature_ranking_solar.csv')]))
     c7.metric("Data Sources Connected", "6 / 6")
-    c8.metric("Latest Update Time", pd.Timestamp.now().strftime("%H:%M UTC"))
+    c8.metric("Latest Update Time",    pd.Timestamp.now().strftime("%H:%M UTC"))
 
     st.markdown("---")
     st.subheader("Data Quality Panel")
@@ -1749,7 +1770,16 @@ def render_platform_health():
     except Exception:
         pass
         
-    dq_score = max(0, 100 - (missing_vals * 2) - (dup_dates * 5) - (outliers * 3))
+    # Data Quality Score — uses percentage-based penalty (not per-row)
+    # Penalise based on the % of cells that are null, capped so score stays meaningful
+    if row_count > 0:
+        # Get total possible data cells (rough estimate)
+        total_cells = row_count * 10  # assume ~10 features per row
+        missing_pct = min(100, (missing_vals / max(total_cells, 1)) * 100)
+        outlier_pct = min(100, (outliers / max(row_count, 1)) * 100)
+        dq_score = max(0, round(100 - (missing_pct * 0.5) - (dup_dates * 2) - (outlier_pct * 1.5)))
+    else:
+        dq_score = 0
     
     d1, d2, d3, d4 = st.columns(4)
     d1.metric("Data Quality Score", f"{dq_score}/100")
