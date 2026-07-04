@@ -11,52 +11,24 @@ import plotly.express as px
 import plotly.graph_objects as go
 import datetime
 import numpy as np
-
-# ── Design system import ────────────────────────────────────────────────────
-_APP_DIR = os.path.dirname(os.path.abspath(__file__))
-if _APP_DIR not in sys.path:
-    sys.path.insert(0, _APP_DIR)
-try:
-    from src.ui.design_system import (
-        ENTERPRISE_CSS, style_chart, page_header, section_title,
-        empty_state, insight_box, executive_insights_section,
-        page_footer, help_expander, downloadable_table,
-        sidebar_status_bar, CHART_HEIGHT, CHART_TEMPLATE
-    )
-    _DS_LOADED = True
-except Exception as _ds_err:
-    _DS_LOADED = False
-    # Fallback stubs so app never crashes
-    ENTERPRISE_CSS = ""
-    CHART_HEIGHT = 340
-    CHART_TEMPLATE = "plotly_white"
-    def style_chart(f, title="", height=340): return f
-    def page_header(icon, title, desc, ts=None): st.title(f"{icon} {title}")
-    def section_title(t): st.subheader(t)
-    def empty_state(msg="No data", icon="📭"): st.info(msg)
-    def insight_box(t, kind="info"): st.info(t)
-    def executive_insights_section(f, s, r): pass
-    def page_footer(): pass
-    def help_expander(d, k): pass
-    def downloadable_table(df, label="CSV", fn="report.csv"): st.dataframe(df, use_container_width=True)
-    def sidebar_status_bar(root): pass
-
 # ==========================================
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Khavda Digital Twin | AGEL",
+    page_title="Khavda Digital Twin",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': 'https://github.com/kirttiik/AI-Renewable-Energy-Intelligence-platform',
-        'Report a bug': 'https://github.com/kirttiik/AI-Renewable-Energy-Intelligence-platform/issues',
-        'About': 'Khavda Digital Twin v3.1.0 — Adani Green Energy Ltd.'
-    }
+    initial_sidebar_state="expanded"
 )
 
-st.markdown(ENTERPRISE_CSS, unsafe_allow_html=True)
+# Custom CSS for styling
+st.markdown("""
+<style>
+    .reportview-container .main .block-container { padding-top: 2rem; }
+    h1, h2, h3 { color: #1E3D59; }
+    .stMetric { background-color: #F5F7FA; padding: 15px; border-radius: 5px; border-left: 5px solid #1E3D59; }
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # DATA LOADING UTILITIES
@@ -140,19 +112,11 @@ def safe_number(value):
 data = get_data_sources()
 
 # ==========================================
-# ==========================================
 # SIDEBAR NAVIGATION
 # ==========================================
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 with st.sidebar:
-    st.markdown("""
-    <div style="text-align:center;padding:8px 0 4px;">
-        <div style="font-size:2.2rem;">⚡</div>
-        <div style="color:#F1C40F;font-weight:700;font-size:1rem;letter-spacing:.04em;">KHAVDA DIGITAL TWIN</div>
-        <div style="color:#7F8C8D;font-size:0.72rem;margin-top:2px;">Adani Green Energy Ltd.</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/3254/3254095.png", width=100)
+    st.title("Khavda Digital Twin")
     st.markdown("---")
     
     sections = [
@@ -173,7 +137,7 @@ with st.sidebar:
         "⚙️ Platform Health",
         "📄 About Platform",
     ]
-    selection = st.radio("Navigate to", sections, label_visibility="collapsed")
+    selection = st.radio("Navigation", sections)
     
     st.markdown("---")
     global_time_horizon = st.radio(
@@ -202,8 +166,8 @@ with st.sidebar:
         elif isinstance(date_range, dt.date):
             custom_start_date = custom_end_date = date_range
     
-    sidebar_status_bar(ROOT_DIR)
-
+    st.markdown("---")
+    st.markdown("v1.0.0 | Production")
 
 # Load hourly data
 def load_hourly_data():
@@ -416,20 +380,7 @@ def render_executive_alerts():
 
 
 def render_executive_overview():
-    page_header(
-        "🏠", "Executive Control Center",
-        "Consolidated situational awareness for Khavda Renewable Energy Park."
-    )
-    help_expander(
-        "This page provides the top-level operational briefing for senior leadership. It summarises generation forecasts, market conditions, and platform health.",
-        {
-            "Forecast Generation": "Total predicted generation in MW for the selected period.",
-            "DAM Price": "Day-Ahead Market clearing price in ₹/kWh from IEX.",
-            "Carbon Offset": "Estimated CO₂ avoided compared to coal-based generation.",
-            "Performance Ratio": "Ratio of actual to theoretical maximum generation (closer to 1 = better).",
-            "Capacity Factor": "Percentage of maximum rated capacity actually generated.",
-        }
-    )
+    st.title("🏠 Executive Control Center")
     render_executive_alerts()
     st.markdown("---")
     
@@ -467,71 +418,40 @@ def render_executive_overview():
     except Exception:
         pass
 
-    section_title("📊 Top-Level KPIs")
+    st.markdown("### Executive Summary")
+    st.info(f"**Briefing:** Today's renewable generation is expected to remain stable at **{today_forecast:,.0f} MW**. Weather risk conditions are currently **{weather_risk}**. The DAM market remains favorable with clearing prices near **₹{dam_price}/kWh**. Forecast confidence is **{forecast_confidence}**.")
+    
+    st.markdown("### Top-Level KPIs")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("⚡ Forecast Generation", f"{today_forecast:,.0f} MW", help="Total predicted generation for the current period.")
-    c2.metric("💹 Current DAM Price", f"₹ {dam_price:.2f}/kWh", help="IEX Day-Ahead Market clearing price.")
-    c3.metric("🌱 Carbon Offset", f"{carbon_offset:,.0f} Tons", help="CO₂ avoided compared to coal generation.")
-    c4.metric("🤖 Forecast Confidence", forecast_confidence, help="AI model confidence level for the current forecast.")
+    c1.metric("Today's Forecast Generation", f"{today_forecast:,.0f} MW")
+    c2.metric("Current DAM Price", f"₹ {dam_price:.2f}/kWh")
+    c3.metric("Expected Carbon Offset", f"{carbon_offset:,.0f} Tons")
+    c4.metric("Forecast Confidence", forecast_confidence)
     
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("⚡ Weather Risk", weather_risk, help="Current operational weather risk classification.")
-    c6.metric("🟢 Pipeline Health", pipeline_health)
-    c7.metric("📊 Performance Ratio", f"{perf_ratio:.2f}", help="Actual vs theoretical max generation ratio.")
-    c8.metric("🌞 Capacity Factor", f"{cap_factor:.1f}%", help="Percentage of rated capacity being generated.")
+    c5.metric("Weather Risk Level", weather_risk)
+    c6.metric("Pipeline Health", pipeline_health)
+    c7.metric("Performance Ratio", f"{perf_ratio:.2f}")
+    c8.metric("Capacity Factor", f"{cap_factor:.1f}%")
 
     st.markdown("---")
     
-    section_title("💻 System Monitoring & Compliance")
+    st.subheader("📊 System Monitoring & Compliance")
     col_left, col_right = st.columns(2)
     with col_left:
         st.markdown(f"**Data Freshness (Latest Update):** {latest_update}")
-        st.markdown("**Model Version:** v3.1.0 (Physics-Informed XGBoost)")
+        st.markdown("**Model Version:** v2.1.0 (Physics-Informed XGBoost)")
     with col_right:
         st.markdown("**GitHub Action Status:** ✅ Passing")
         st.markdown(f"**Plant Health Score:** {plant_health_score}/100")
         
-    insight_box(
-        f"📌 **Executive Briefing:** Today’s renewable generation forecast stands at <strong>{today_forecast:,.0f} MW</strong>. "
-        f"Weather risk is classified as <strong>{weather_risk}</strong>. DAM market price is <strong>₹{dam_price:.2f}/kWh</strong>. "
-        f"Forecast confidence is <strong>{forecast_confidence}</strong>. All systems are operational."
-    )
-
-    executive_insights_section(
-        findings=[
-            f"Today’s forecast: {today_forecast:,.0f} MW at {perf_ratio:.2f} PR.",
-            f"Carbon avoided: {carbon_offset:,.0f} Tons CO₂ equivalent.",
-            "No major weather events expected in the next 48 hours.",
-            "IEX market prices are within normal operating range.",
-        ],
-        summary="The Khavda plant is operating at expected efficiency with healthy forecast confidence. Carbon credits are accruing normally.",
-        recommendations=[
-            "Review IEX bidding strategy for tomorrow’s DAM based on current confidence levels.",
-            "Continue current maintenance schedule — no urgency flagged.",
-            "Monitor cloud cover forecast for the next 48 hours.",
-            "Verify tracker alignment reports for optimal irradiance capture.",
-            "Schedule weekly model retraining check with the MLOps team.",
-        ]
-    )
-    page_footer()
-
-
+    st.markdown("---")
 
 def render_plant_performance():
-    page_header("⚡", "Plant Performance",
-        "Granular asset performance tracking against ML-forecasted baselines and PV physics benchmarks.")
-    help_expander(
-        "This page exposes real-time engineering metrics from the Physics-Informed PV Engine. Use it to identify operational gaps and deviations from expected performance.",
-        {
-            "Performance Ratio (PR)": "Actual yield vs theoretical yield. PR > 0.80 = excellent; PR < 0.75 = investigate.",
-            "Capacity Factor": "Fraction of rated capacity generated. Seasonal variations are normal.",
-            "Cell Temperature": "PV cell operating temp. Efficiency drops ~0.4%/°C above 25°C STC.",
-            "Cloud Curtailment": "% generation lost due to cloud optical attenuation.",
-            "Effective Irradiance": "Usable solar radiation reaching the PV cell surface after all losses.",
-        }
-    )
-    ROOT = os.path.dirname(os.path.abspath(__file__))
+    st.title("⚡ Plant Performance")
+    st.markdown("Track granular asset performance against ML-forecasted baselines to immediately identify operational gaps.")
     
+    ROOT = os.path.dirname(os.path.abspath(__file__))
     
     # ---------------------------------------------------------
     # A. Plant KPIs
@@ -686,37 +606,12 @@ def render_plant_performance():
         """)
         
     st.markdown("---")
-    executive_insights_section(
-        findings=[
-            "Performance Ratio is within target operating range.",
-            "Cell temperature shows seasonal elevation — normal for summer months.",
-            "Cloud curtailment is the primary source of generation variance.",
-            "No structural anomalies detected in the irradiance-to-power transfer function.",
-        ],
-        summary="Plant assets are operating within engineering design parameters. Minor thermal losses are within expected seasonal ranges.",
-        recommendations=[
-            "Schedule panel cleaning if performance ratio drops below 0.78.",
-            "Correlate cloud cover forecasts with generation dispatch decisions.",
-            "Review inverter cooling system performance during peak heat periods.",
-            "Audit tracker alignment data against theoretical maximum irradiance capture.",
-            "Flag any day where PR drops below 0.75 for root cause investigation.",
-        ]
-    )
-    page_footer()
+
+
 
 def render_forecasting():
-    page_header("🔮", "AI Forecasting & Predictive Intelligence",
-        "Day-Ahead and Week-Ahead generation projections powered by XGBoost and pvlib Physics Engine.")
-    help_expander(
-        "This page displays AI-generated generation forecasts based on weather inputs, PV physics, and historical patterns. The inference chain shows the full ML pipeline from physics to final forecast.",
-        {
-            "Physics Estimate": "Deterministic generation estimate from pvlib PV model using weather inputs.",
-            "AI Adjustment": "XGBoost correction layer that learns historical deviations from physics baseline.",
-            "Forecast Confidence": "Model certainty score. Above 90% = High; 70–90% = Medium; below 70% = Low.",
-            "MAE": "Mean Absolute Error — average MW deviation between prediction and actual.",
-            "R² Score": "Coefficient of determination. Closer to 1.0 = better model fit.",
-        }
-    )
+    st.title("🔮 AI Forecasting & Predictive Intelligence")
+    st.markdown("Day-Ahead and Week-Ahead generation projections powered by XGBoost.")
     
     # Pipeline Chain Banner
     st.markdown("""
@@ -850,16 +745,8 @@ def render_forecasting():
     st.info("💡 **Trading Insight:** The XGBoost model predicts a 15% surge in wind generation over the next 48 hours due to incoming coastal fronts. Recommend increasing Day-Ahead Market (DAM) volume bids for the evening peak blocks.")
 
 def render_carbon_analytics():
-    page_header("🌱", "Carbon Analytics",
-        "Sustainability tracking, carbon offset metrics, and environmental impact reporting.")
-    help_expander(
-        "This page translates renewable generation into tangible environmental impact metrics.",
-        {
-            "Total CO₂ Avoided": "Metric tons of CO₂ equivalent avoided compared to coal generation baseline.",
-            "Total Coal Saved": "Metric tons of coal that would have been burned to produce equivalent energy.",
-            "Trees Equivalent": "Number of mature trees required to absorb the avoided CO₂ over one year.",
-        }
-    )
+    st.title("🌱 Carbon Analytics")
+    st.markdown("Sustainability tracking and environmental impact.")
     
     df_carb = filter_by_time_horizon(data['carbon'], global_time_horizon, custom_start_date, custom_end_date)
     if not df_carb.empty:
@@ -867,47 +754,21 @@ def render_carbon_analytics():
         total_coal = df_carb['coal_saved_tons'].sum()
         total_trees = df_carb['trees_equivalent_million'].sum()
         
-        section_title("🌍 Environmental Impact KPIs")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total CO₂ Avoided", f"{safe_number(total_co2):,.2f} Tons")
         col2.metric("Total Coal Saved", f"{safe_number(total_coal):,.2f} Tons")
         col3.metric("Trees Equivalent", f"{safe_number(total_trees):,.2f} Million")
         
-        st.markdown("---")
-        section_title("📈 Offset Trends")
         fig = px.area(df_carb, x='date', y='co2_avoided_tons', title="CO₂ Avoided Over Time", color_discrete_sequence=['forestgreen'])
-        fig = style_chart(fig, "Daily CO₂ Avoided (Tons)")
-        fig.update_traces(mode='lines+markers', line=dict(width=3))
+        fig.update_traces(mode='lines+markers')
         st.plotly_chart(fig, use_container_width=True)
-        
-        executive_insights_section(
-            findings=[
-                f"Generated {total_co2:,.0f} tons of CO₂ offset in the selected period.",
-                f"Equivalent to planting {total_trees:,.2f} million trees.",
-                "Carbon abatement trajectory remains strictly aligned with capacity factor.",
-            ],
-            summary="The portfolio is generating stable carbon offsets. The high confidence forecast indicates consistent REC (Renewable Energy Certificate) generation.",
-            recommendations=[
-                "Export this report for the monthly corporate ESG filing.",
-                "Consider monetizing excess RECs on the IEX Green-Term Ahead Market.",
-            ]
-        )
     else:
-        empty_state("Carbon Analytics dataset is missing or empty for this timeframe.")
-    
-    page_footer()
+        st.warning("Carbon Analytics dataset is missing.")
 
 def render_weather_intelligence():
-    page_header("🌤", "Weather Intelligence",
-        "Advanced atmospheric and PV physics tracking for predictive plant operations.")
-    help_expander(
-        "Combines NASA POWER and Open-Meteo APIs to predict operational risks (cloud curtailment, heat stress, soiling).",
-        {
-            "Cloud Curtailment Risk": "Probability of generation loss due to optical cloud thickness.",
-            "Temperature Stress": "Efficiency loss expected due to cell heating above STC.",
-            "Wind Cooling Effect": "Beneficial natural cooling of PV modules from high ambient wind speeds.",
-        }
-    )
+    st.title("🌤 Weather Intelligence")
+    st.markdown("Advanced atmospheric and PV physics tracking for predictive plant operations.")
+    
     ROOT = os.path.dirname(os.path.abspath(__file__))
     
     # Generate mock 7-day weather data for timeline and charts
@@ -989,36 +850,13 @@ def render_weather_intelligence():
     
     if alerts:
         for a in alerts:
-            insight_box(f"**Alert:** {a}", "warning")
+            st.warning(f"⚠️ {a}")
     else:
-        insight_box("No extreme weather events expected over the next 48 hours. Dust accumulation risk remains moderate.", "success")
-        
-    executive_insights_section(
-        findings=[
-            f"Highest temperature expected: {temps.max():.1f}°C, triggering moderate thermal derating.",
-            f"Peak cloud cover: {clouds.max():.1f}%.",
-            f"Expected rainfall total: {sum(rain):.1f} mm.",
-        ],
-        summary="Weather conditions represent a moderate risk to generation over the next 7 days, primarily driven by thermal stress during peak noon hours.",
-        recommendations=[
-            "Monitor inverter internal temperatures during peak heat days.",
-            "Use rainfall events to reduce manual O&M panel washing requirements.",
-            "Adjust DAM volume bids downwards on days exceeding 60% cloud cover.",
-        ]
-    )
-    page_footer()
+        st.info("No extreme weather events expected over the next 48 hours. Dust accumulation risk remains moderate.")
 
 def render_explainability():
-    page_header("🧠", "AI Explainability & Model Performance",
-        "Demystifying machine learning predictions and evaluating XGBoost model metrics.")
-    help_expander(
-        "This section audits the AI models to ensure regulatory compliance and operational trust. It translates complex model features into actionable engineering recommendations.",
-        {
-            "MAE (Mean Absolute Error)": "Average deviation in MW between actual and predicted output. Lower is better.",
-            "RMSE (Root Mean Square Error)": "Penalizes large errors heavily. Useful for extreme weather event evaluation.",
-            "R² Score": "Percentage of generation variance explained by the model. 1.0 is perfect.",
-        }
-    )
+    st.title("🧠 AI Explainability & Model Performance")
+    st.markdown("Demystifying machine learning predictions, evaluating model metrics, and translating features into operational engineering actions.")
     
     # ---------------------------------------------------------
     # Model Performance Section (Task 6)
@@ -1099,31 +937,10 @@ def render_explainability():
             st.warning(f"**Operational Recommendation:** {item['Operational Recommendation']}")
             st.error(f"**Suggested Action:** {item['Suggested Action']}")
             st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-            
-    executive_insights_section(
-        findings=[
-            "The Total Output Model maintains high generalization with an R² of 0.94.",
-            "Solar generation predictions are slightly more accurate than wind generation predictions.",
-            "Effective Irradiance and Cell Temperature are the dominant features driving the AI model.",
-        ],
-        summary="The AI models are highly stable and reliable for Day-Ahead trading and dispatch scheduling.",
-        recommendations=[
-            "No immediate model retraining is required; data drift is within acceptable bounds.",
-            "Continue to prioritize sensor calibration for irradiance and temperature telemetry.",
-        ]
-    )
-    page_footer()
 
 def render_shap_analytics():
-    page_header("🔬", "SHAP Analytics",
-        "Advanced Model Explainability using SHapley Additive exPlanations. Understand exactly *why* the AI predicts what it does.")
-    help_expander(
-        "SHAP breaks down every AI prediction into its component parts, showing exactly how much (in MW) each weather or temporal feature contributed to the final forecast.",
-        {
-            "Global SHAP Summary": "The average overall impact of each feature on the model across all time.",
-            "Mean Absolute SHAP": "The absolute magnitude of influence a feature has on predictions.",
-        }
-    )
+    st.title("🔬 SHAP Analytics")
+    st.markdown("Advanced Model Explainability using SHapley Additive exPlanations. Understand exactly *why* the AI predicts what it does.")
     
     shap_rank_df = data.get('shap_solar_rank', pd.DataFrame())
     ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -1188,23 +1005,9 @@ def render_shap_analytics():
     st.markdown("---")
     st.subheader("Executive AI Interpretation")
     
-    insight_box(f"**Engineering Interpretation:** The model attributes the highest predictive variance to **{top_driver_friendly}**, indicating that structural atmospheric changes heavily dictate the PV generation envelope.")
-    insight_box(f"**Business Interpretation:** Forecasting accuracy is hyper-sensitive to **{top_driver_friendly}** fluctuations. Poor data quality in this feature will result in significant deviation penalties.")
-    insight_box(f"**Executive Recommendation:** Invest in high-resolution, hyper-local sensor hardware for **{top_driver_friendly}** to drastically reduce model uncertainty and financial risk.", "warning")
-
-    executive_insights_section(
-        findings=[
-            f"{top_driver_friendly} is the primary driver of model predictions.",
-            f"{second_driver_friendly} is the secondary driver.",
-            f"A total of {total_features} features are actively monitored and interpreted by the model."
-        ],
-        summary="The SHAP analysis confirms that the XGBoost model is learning physically sound relationships between atmospheric conditions and power generation, rather than spurious correlations.",
-        recommendations=[
-            f"Prioritize sensor maintenance and data quality for {top_driver_friendly} telemetry.",
-            "Use SHAP dependency plots (when available) to investigate non-linear temperature impacts.",
-        ]
-    )
-    page_footer()
+    st.markdown(f"**Engineering Interpretation:** The model attributes the highest predictive variance to **{top_driver_friendly}**, indicating that structural atmospheric changes heavily dictate the PV generation envelope.")
+    st.markdown(f"**Business Interpretation:** Forecasting accuracy is hyper-sensitive to **{top_driver_friendly}** fluctuations. Poor data quality in this feature will result in significant deviation penalties.")
+    st.markdown(f"**Executive Recommendation:** Invest in high-resolution, hyper-local sensor hardware for **{top_driver_friendly}** to drastically reduce model uncertainty and financial risk.")
 
 # ===========================================================================
 # IEX ANALYTICS — Data Loader (cached)
@@ -1268,15 +1071,10 @@ def load_iex_data():
 # IEX ANALYTICS — Render
 # ===========================================================================
 def render_iex_analytics():
-    page_header("⚡", "IEX Market Intelligence",
-        "Real-time Indian Energy Exchange (IEX) Day-Ahead Market analytics fused with AI generation forecasts.")
-    help_expander(
-        "Integrates Khavda's generation forecasts with real-time IEX DAM (Day-Ahead Market) pricing to predict and optimize daily revenue.",
-        {
-            "Avg DAM Price": "Average Day-Ahead Market clearing price.",
-            "Price Volatility": "Standard deviation of price as a percentage of the mean.",
-            "Scenario Simulator": "Tool to test revenue sensitivity to price and generation fluctuations.",
-        }
+    st.title("⚡ IEX Market Intelligence")
+    st.markdown(
+        "Real-time Indian Energy Exchange (IEX) Day-Ahead Market analytics "
+        "fused with AI generation forecasts for end-to-end revenue intelligence."
     )
 
     iex_d = load_iex_data()
@@ -1300,7 +1098,8 @@ def render_iex_analytics():
     # ======================================================================
     # SECTION 1 — MARKET OVERVIEW KPIs
     # ======================================================================
-    section_title("📊 Market Overview")
+    st.markdown("---")
+    st.subheader("📊 Market Overview")
 
     kpi = summary.iloc[0].to_dict() if not summary.empty else {}
 
@@ -1328,7 +1127,7 @@ def render_iex_analytics():
     # SECTION 2 — IEX PRICE ANALYTICS
     # ======================================================================
     st.markdown("---")
-    section_title("📈 IEX DAM Price Analytics")
+    st.subheader("📈 IEX DAM Price Analytics")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "Daily Trend", "Monthly Avg", "Distribution", "Volatility"
@@ -1489,7 +1288,7 @@ def render_iex_analytics():
     # SECTION 4 — FUTURE REVENUE FORECAST
     # ======================================================================
     st.markdown("---")
-    section_title("🔮 Future Revenue Forecast")
+    st.subheader("🔮 Future Revenue Forecast")
 
     if future.empty:
         st.info("No future forecast data available. Run the pipeline to generate predictions.")
@@ -1547,7 +1346,7 @@ def render_iex_analytics():
     # SECTION 5 — SCENARIO SIMULATOR
     # ======================================================================
     st.markdown("---")
-    section_title("🎮 Revenue Scenario Simulator")
+    st.subheader("🎮 Revenue Scenario Simulator")
     st.markdown("Adjust market conditions and see the projected revenue impact in real-time.")
 
     col_sl1, col_sl2 = st.columns(2)
@@ -1591,23 +1390,67 @@ def render_iex_analytics():
     else:
         st.info("Run the pipeline to enable scenario simulation.")
 
+    # ======================================================================
+    # SECTION 6 — EXECUTIVE MARKET INSIGHTS
+    # ======================================================================
+    st.markdown("---")
+    st.subheader("🧠 Executive Market Insights")
+
+    if not insights.empty:
+        for _, row in insights.iterrows():
+            with st.expander(f"📌 {row.get('Section', 'Insight')}", expanded=False):
+                st.markdown(row.get('Insight', ''))
+    else:
+        # Fallback static insights
+        static_insights = [
+            ("Price Seasonality",
+             "IEX DAM prices peak during summer months (April–June) driven by high cooling demand, "
+             "aligning perfectly with Khavda's solar generation peak — a powerful revenue multiplier."),
+            ("Revenue Concentration",
+             "The top 3 revenue months account for the majority of annual market revenue. "
+             "Strategic scheduling of maintenance windows during monsoon months maximises revenue capture."),
+            ("Market Volatility Risk",
+             "IEX price volatility requires a hedging strategy. PPAs for 60–70% of capacity is recommended "
+             "alongside active participation in the spot market for the remaining volume."),
+            ("Future Revenue Outlook",
+             "AI-driven forecasts confirm stable renewable output over the next 14 days. "
+             "Revenue is expected to remain consistent with seasonal averages."),
+            ("Market Floor Strategy",
+             "Khavda's variable cost per MWh remains well below the IEX market price floor, "
+             "ensuring positive contribution margin under all market clearing scenarios."),
+        ]
+        for section, text in static_insights:
+            with st.expander(f"📌 {section}", expanded=False):
+                st.markdown(text)
+
+    # ======================================================================
+    # SECTION 7 — DOWNLOAD EXPORTS
+    # ======================================================================
+    st.markdown("---")
+    st.subheader("📥 Export Market Reports")
+
+    ROOT = os.path.dirname(os.path.abspath(__file__))
+    export_files = {
+        "IEX Market Summary KPIs": os.path.join(ROOT, 'reports', 'market', 'iex_market_summary.csv'),
+        "Revenue Backtesting":     os.path.join(ROOT, 'reports', 'market', 'revenue_backtesting.csv'),
+        "Future Market Revenue":   os.path.join(ROOT, 'reports', 'market', 'future_market_revenue.csv'),
+        "Executive Market Insights": os.path.join(ROOT, 'reports', 'market', 'market_executive_insights.csv'),
+    }
+
+    cols = st.columns(len(export_files))
+    for i, (label, path) in enumerate(export_files.items()):
+        with cols[i]:
+            if os.path.exists(path):
+                with open(path, 'rb') as f:
+                    st.download_button(
+                        label=f"⬇️ {label}",
+                        data=f.read(),
+                        file_name=os.path.basename(path),
+                        mime='text/csv',
+                        key=f'dl_{i}'
+                    )
             else:
                 st.caption(f"{label} not generated yet.")
-
-    executive_insights_section(
-        findings=[
-            "IEX DAM prices peak during summer months (April–June) driven by high cooling demand.",
-            "The top 3 revenue months account for the majority of annual market revenue.",
-            "Forward revenue forecasts indicate stable performance over the next 14 days.",
-        ],
-        summary="Khavda is strongly positioned in the current DAM environment. Variable costs remain well below the market floor price, guaranteeing a positive contribution margin.",
-        recommendations=[
-            "Hedge 60–70% of capacity via PPAs to mitigate spot market volatility.",
-            "Align scheduled maintenance windows with monsoon months (low IEX price and low solar generation).",
-            "Monitor evening peak blocks for high-margin wind dispatch opportunities.",
-        ]
-    )
-    page_footer()
 
 
 # ==========================================
@@ -1618,16 +1461,14 @@ def render_iex_analytics():
 # GRID INTELLIGENCE
 # ===========================================================================
 def render_grid_analytics():
-    page_header("🌐", "Grid Intelligence (NLDC Frequency Monitor)",
-        "Track National Load Despatch Centre (NLDC) daily grid frequency to predict curtailment risks and Deviation Settlement Mechanism (DSM) penalties.")
-    help_expander(
-        "Monitors the Indian national grid frequency to flag potential grid stress events. Helps plant operators understand external factors driving curtailment.",
-        {
-            "Average Frequency": "Mean grid frequency (target is exactly 50.00 Hz).",
-            "Danger Zone Blocks": "15-minute intervals where frequency breached regulatory limits, triggering DSM penalties.",
-            "Real-Time Simulator": "Interactive tool to train operators on crisis response financial impacts.",
-        }
+    st.title("🌐 Grid Intelligence (NLDC Frequency Monitor)")
+    st.markdown(
+        """
+        Track National Load Despatch Centre (NLDC) daily grid frequency to predict 
+        curtailment risks and Deviation Settlement Mechanism (DSM) financial penalties.
+        """
     )
+    st.markdown("---")
 
     ROOT = os.path.dirname(os.path.abspath(__file__))
     grid_path = os.path.join(ROOT, 'data', 'grid', 'nldc_grid_frequency.csv')
@@ -1667,7 +1508,7 @@ def render_grid_analytics():
         st.metric(label="Danger Zone Blocks", value=f"{danger_blocks}", delta="Action Required" if danger_blocks > 0 else "Stable", delta_color="off" if danger_blocks == 0 else "inverse")
     
     st.markdown("---")
-    section_title("📈 15-Minute Frequency Profile & Regulatory Bands")
+    st.subheader("📈 15-Minute Frequency Profile & Regulatory Bands")
     
     fig = go.Figure()
     
@@ -1714,7 +1555,7 @@ def render_grid_analytics():
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
-    section_title("📑 Deviation Settlement Mechanism (DSM) Logs")
+    st.subheader("📑 Deviation Settlement Mechanism (DSM) Logs")
     st.markdown("Historical 15-minute raw interval logging with operational risk classification:")
     
     display_df = df_f[['datetime', 'frequency_hz', 'grid_stress_flag']].copy()
@@ -1733,8 +1574,14 @@ def render_grid_analytics():
     st.dataframe(display_df.style.map(style_flags, subset=['Grid Stress Flag']), use_container_width=True, height=400)
 
     st.markdown("---")
-    section_title("⚡ Real-Time Grid Crisis Simulator")
-    insight_box("Industrial Control Room Simulation Tool: Test how varying operational response times to sudden weather anomalies and grid frequency excursions impact financial penalties under the Deviation Settlement Mechanism (DSM).")
+    st.markdown("## ⚡ Real-Time Grid Crisis Simulator")
+    st.markdown(
+        """
+        **Industrial Control Room Simulation Tool:** 
+        Test how varying operational response times to sudden weather anomalies and grid frequency 
+        excursions impact financial penalties under the Deviation Settlement Mechanism (DSM).
+        """
+    )
     
     col_input1, col_input2 = st.columns([2, 1])
     
@@ -1838,34 +1685,13 @@ def render_grid_analytics():
         st.markdown(f"**Operator Efficiency Rating: {int(sim_efficiency)}%**")
         st.progress(sim_efficiency / 100.0)
 
-    executive_insights_section(
-        findings=[
-            "Grid frequency largely remained within the CERC safe operating band.",
-            "Isolated deviations did not result in material DSM financial penalties.",
-        ],
-        summary="Khavda is maintaining excellent grid compliance. AI generation forecasts are accurately translating into actionable schedules.",
-        recommendations=[
-            "Continue aligning physical generation with AI-driven Day-Ahead schedules.",
-            "Use the crisis simulator in quarterly training sessions for control room operators.",
-        ]
-    )
-    page_footer()
-
 def render_platform_health():
-    page_header("⚙️", "Platform Health",
-        "Real-time operational status of all data pipelines, models, and microservices.")
-    help_expander(
-        "Monitors the end-to-end health of the Khavda Digital Twin infrastructure.",
-        {
-            "Data Quality Score": "Composite metric penalizing missing data, outliers, and duplicates.",
-            "API Status": "Checks for the existence and freshness of raw data feeds.",
-            "GitHub Actions": "Status of the CI/CD pipeline responsible for orchestrating data jobs.",
-        }
-    )
+    st.title("⚙️ Platform Health")
+    st.markdown("Real-time operational status of all data pipelines, models, and microservices.")
     
     ROOT = os.path.dirname(os.path.abspath(__file__))
     
-    section_title("System Status")
+    st.subheader("System Status")
     c1, c2, c3, c4 = st.columns(4)
     
     def check_file(filename):
@@ -1913,7 +1739,7 @@ def render_platform_health():
     c8.metric("Latest Update Time",    pd.Timestamp.now().strftime("%H:%M UTC"))
 
     st.markdown("---")
-    section_title("Data Quality Panel")
+    st.subheader("Data Quality Panel")
     
     missing_vals = 0
     dup_dates = 0
@@ -1963,22 +1789,9 @@ def render_platform_health():
     
     st.markdown(f"**Total Model Input Records Analyzed:** {row_count}")
 
-    executive_insights_section(
-        findings=[
-            f"Overall Data Quality Score is {dq_score}/100.",
-            "All core API feeds (NASA POWER, Open-Meteo, IEX) are responding nominally.",
-            "Forecast models successfully completed the latest inference cycle.",
-        ],
-        summary="The data ingestion and machine learning pipelines are exceptionally stable. Data quality is sufficient for Day-Ahead trading.",
-        recommendations=[
-            "Set up automated alert triggers if Data Quality Score drops below 85.",
-            "Audit missing values in the raw telemetry data feed.",
-        ]
-    )
-    page_footer()
-
 def render_about_platform():
-    page_header("📄", "About Platform", "Khavda Digital Twin Command Center")
+    st.title("📄 About Platform")
+    st.markdown("### Khavda Digital Twin Command Center")
     st.markdown("This platform acts as the central intelligence hub for the Khavda Renewable Energy Park, blending physical engineering models with advanced machine learning forecasts.")
     
     with st.expander("Architecture Diagram", expanded=True):
@@ -1996,7 +1809,8 @@ def render_about_platform():
     with st.expander("Machine Learning & Physics"):
         st.markdown("- **Physics:** `pvlib` used for Clear Sky, Air Mass, and POA irradiance modeling.\n- **ML:** 3 independent XGBoost regressors for Solar, Wind, and Total Output.\n- **Explainability:** SHAP values integrated with real-world engineering mapping.")
         
-    page_footer()
+    st.markdown("---")
+    st.caption("Version: 2.1.0 | AGEL Enterprise Release")
 
 if selection == "🏠 Executive Control Center":
     # The Executive Alert Banner logic is placed inside the Executive Control Center rendering
