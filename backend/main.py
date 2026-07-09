@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from routers import executive
+from routers import executive, weather
 
 app = FastAPI(
     title="Green Energy Platform API",
@@ -20,6 +20,7 @@ app.add_middleware(
 )
 
 app.include_router(executive.router)
+app.include_router(weather.router)
 
 @app.get("/")
 def read_root():
