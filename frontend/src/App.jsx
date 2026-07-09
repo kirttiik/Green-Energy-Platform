@@ -35,7 +35,7 @@ function App() {
   const [healthStatus, setHealthStatus] = useState('Checking backend...')
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/health')
+    fetch('http://127.0.0.1:8000/api/health')
       .then(res => res.json())
       .then(data => setHealthStatus(`Backend: ${data.status}`))
       .catch(err => setHealthStatus('Backend: offline'))

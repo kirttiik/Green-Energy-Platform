@@ -9,8 +9,8 @@ export default function WeatherIntelligence() {
 
   useEffect(() => {
     Promise.all([
-      fetch('http://localhost:8000/api/weather/metrics').then(res => res.json()),
-      fetch('http://localhost:8000/api/weather/forecast').then(res => res.json())
+      fetch('http://127.0.0.1:8000/api/weather/metrics').then(res => res.json()),
+      fetch('http://127.0.0.1:8000/api/weather/forecast').then(res => res.json())
     ])
     .then(([metricsData, forecastData]) => {
       setMetrics(metricsData)

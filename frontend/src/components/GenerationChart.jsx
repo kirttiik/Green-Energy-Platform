@@ -6,7 +6,7 @@ export default function GenerationChart() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/executive/generation-chart')
+    fetch('http://127.0.0.1:8000/api/executive/generation-chart')
       .then(res => res.json())
       .then(result => {
         setData(result)

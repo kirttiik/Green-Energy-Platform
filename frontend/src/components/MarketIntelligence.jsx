@@ -9,8 +9,8 @@ export default function MarketIntelligence() {
 
   useEffect(() => {
     Promise.all([
-      fetch('http://localhost:8000/api/market/prices').then(res => res.json()),
-      fetch('http://localhost:8000/api/market/chart').then(res => res.json())
+      fetch('http://127.0.0.1:8000/api/market/prices').then(res => res.json()),
+      fetch('http://127.0.0.1:8000/api/market/chart').then(res => res.json())
     ])
     .then(([metricsData, chartRes]) => {
       setMetrics(metricsData)

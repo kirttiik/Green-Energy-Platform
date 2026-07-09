@@ -6,7 +6,7 @@ export default function ExecutiveDashboard() {
 
   useEffect(() => {
     // Fetch overview data from FastAPI backend
-    fetch('http://localhost:8000/api/executive/overview')
+    fetch('http://127.0.0.1:8000/api/executive/overview')
       .then(res => res.json())
       .then(result => {
         setData(result)
