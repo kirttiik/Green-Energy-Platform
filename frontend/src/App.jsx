@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import ExecutiveDashboard from './components/ExecutiveDashboard'
 import GenerationChart from './components/GenerationChart'
 import WeatherIntelligence from './components/WeatherIntelligence'
+import MarketIntelligence from './components/MarketIntelligence'
 
 function ExecutivePage() {
   return (
@@ -72,7 +73,7 @@ function App() {
               <Route path="/forecast" element={<PlaceholderPage title="Generation Forecast" />} />
               <Route path="/weather" element={<WeatherIntelligence />} />
               <Route path="/sustainability" element={<PlaceholderPage title="Sustainability Analytics" />} />
-              <Route path="/market" element={<PlaceholderPage title="Market Intelligence" />} />
+              <Route path="/market" element={<MarketIntelligence />} />
               <Route path="/grid" element={<PlaceholderPage title="Grid Intelligence" />} />
               <Route path="/explainability" element={<PlaceholderPage title="AI Explainability" />} />
               <Route path="/shap" element={<PlaceholderPage title="SHAP Analytics" />} />
