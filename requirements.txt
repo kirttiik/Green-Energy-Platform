@@ -15,3 +15,5 @@ pvlib
 pyyaml
 google-generativeai
 python-dotenv
+fastapi
+uvicorn
